@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "autoname": "NCSL-.YYYY.-.#####",
+ "creation": "2026-04-15 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "status",
+  "submitted_at",
+  "column_break_pxss",
+  "merged_image",
+  "processed_at",
+  "section_break_iewb",
+  "ai_response",
+  "column_break_zpqw",
+  "error_message",
+  "section_break_otoj",
+  "lead",
+  "column_break_emrn",
+  "scans_remaining"
+ ],
+ "fields": [
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nQuota Exceeded"
+  },
+  {
+   "fieldname": "submitted_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Submitted At"
+  },
+  {
+   "fieldname": "processed_at",
+   "fieldtype": "Datetime",
+   "label": "Processed At"
+  },
+  {
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Lead Created",
+   "options": "Lead"
+  },
+  {
+   "fieldname": "scans_remaining",
+   "fieldtype": "Int",
+   "label": "Scans Remaining"
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Small Text",
+   "label": "Error Message"
+  },
+  {
+   "fieldname": "merged_image",
+   "fieldtype": "Attach",
+   "label": "Merged Card Image"
+  },
+  {
+   "fieldname": "column_break_pxss",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_iewb",
+   "fieldtype": "Section Break",
+   "label": "Response"
+  },
+  {
+   "fieldname": "section_break_otoj",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_emrn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_response",
+   "fieldtype": "Code",
+   "label": "AI Response (JSON)",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "column_break_zpqw",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-15 12:29:59.498087",
+ "modified_by": "krushang.patel@satat.tech",
+ "module": "NextIQ",
+ "name": "Card Scan Log",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "submitted_at",
+ "sort_order": "DESC",
+ "states": []
+}
