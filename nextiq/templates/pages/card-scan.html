@@ -559,7 +559,7 @@ html, body {
     img.src = frontDataURL;
     thumbSlot.innerHTML = "";
     thumbSlot.appendChild(img);
-    thumbSlot.onclick = null;
+    thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
     btnRedo.classList.add("visible");
     autoScanOn ? startHeuristic() : resetSteady();
   }
