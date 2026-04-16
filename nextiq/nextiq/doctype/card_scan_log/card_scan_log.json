@@ -17,7 +17,9 @@
   "section_break_otoj",
   "lead",
   "column_break_emrn",
-  "scans_remaining"
+  "scans_remaining",
+  "job_id",
+  "cb_secret"
  ],
  "fields": [
   {
@@ -25,7 +27,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nQuota Exceeded"
+   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nQuota Exceeded\nDuplicate Lead"
   },
   {
    "fieldname": "submitted_at",
@@ -61,6 +63,20 @@
    "label": "Merged Card Image"
   },
   {
+   "fieldname": "job_id",
+   "fieldtype": "Data",
+   "label": "Job ID",
+   "read_only": 1,
+   "description": "Unique token linking this log to the nextiq_service scan job."
+  },
+  {
+   "fieldname": "cb_secret",
+   "fieldtype": "Data",
+   "label": "Callback Secret",
+   "hidden": 1,
+   "description": "Single-use secret that verifies the callback is from nextiq_service. Cleared after use."
+  },
+  {
    "fieldname": "column_break_pxss",
    "fieldtype": "Column Break"
   },
@@ -89,8 +105,8 @@
   }
  ],
  "links": [],
- "modified": "2026-04-15 12:29:59.498087",
- "modified_by": "krushang.patel@satat.tech",
+ "modified": "2026-04-16 00:00:00.000000",
+ "modified_by": "Administrator",
  "module": "NextIQ",
  "name": "Card Scan Log",
  "naming_rule": "Expression",
@@ -102,6 +118,11 @@
    "read": 1,
    "role": "System Manager",
    "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All",
+   "if_owner": 1
   }
  ],
  "row_format": "Dynamic",
