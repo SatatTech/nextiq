@@ -595,78 +595,37 @@ html, body {
     captureLabel.textContent = on ? "Processing…" : "Tap to capture";
   }
 
-  // ── Submit + poll ──────────────────────────────────────────────────────
+  // ── Submit (fire and forget) ───────────────────────────────────────────
+  // After submit the browser does nothing more — Lead is created in the
+  // background and the user is notified by email when it is ready.
+  let _submitLocked = false;
+
   async function submitInBackground(frontURL, backURL) {
+    if (_submitLocked) return;
+    _submitLocked = true;
+
+    // Disable shutter briefly to prevent accidental double-tap
     setProcessing(true);
     showSnackbar("Uploading card…", "processing", "");
-    let logName = null;
 
     try {
       const merged = await mergeImages(frontURL, backURL);
-      const submitResult = await frappe.xcall("nextiq.api.submit_card_scan", {
+      await frappe.xcall("nextiq.api.submit_card_scan", {
         merged_image_base64: merged.split(",")[1],
         filename: "business_card.jpg",
       });
-      logName = submitResult.log_name;
+      // Card submitted — user can close the portal now
+      showSnackbar("Card submitted!", "success",
+        "Lead will be created shortly. You can close this page.", 8000);
     } catch (e) {
-      showSnackbar("Upload failed", "error", e.message || String(e));
-      setProcessing(false);
-      return;
+      showSnackbar("Upload failed", "error", e.message || String(e), 6000);
     }
 
-    showSnackbar("Processing with AI…", "processing", "This may take up to 30 seconds");
-    pollStatus(logName);
-  }
-
-  function pollStatus(logName) {
-    const MAX_POLLS = 45;  // 45 × 2s = 90s timeout
-    let polls = 0;
-
-    const timer = setInterval(async () => {
-      polls++;
-      if (polls > MAX_POLLS) {
-        clearInterval(timer);
-        showSnackbar("Timed out waiting for AI response", "error", "Check Card Scan Logs for status");
-        setProcessing(false);
-        return;
-      }
-
-      try {
-        const status = await frappe.xcall("nextiq.api.get_card_scan_status", { log_name: logName });
-
-        if (status.status === "Success") {
-          clearInterval(timer);
-          const sub = status.scans_remaining !== null
-            ? `${status.scans_remaining} scan(s) remaining`
-            : "";
-          showSnackbar("Lead created successfully ✦", "success", sub, 6000);
-          setProcessing(false);
-
-        } else if (status.status === "Invalid Image") {
-          clearInterval(timer);
-          const sub = status.scans_remaining !== null
-            ? `1 scan was used. ${status.scans_remaining} remaining.`
-            : "";
-          showSnackbar("Not a business card", "warning",
-            sub, 8000);
-          setProcessing(false);
-
-        } else if (status.status === "Quota Exceeded") {
-          clearInterval(timer);
-          showSnackbar("Quota exhausted", "error",
-            "You have no scans remaining. Contact NextIQ team to add more.", 8000);
-          setProcessing(false);
-
-        } else if (status.status === "Failed") {
-          clearInterval(timer);
-          showSnackbar("Processing failed", "error", status.error_message || "Unknown error", 6000);
-          setProcessing(false);
-        }
-        // Pending / Processing → keep polling
-      } catch (_) {
-        // Network hiccup — keep polling
-      }
-    }, 2000);
+    // Re-enable after 3s debounce — prevents duplicate submission on double-tap
+    setTimeout(() => {
+      setProcessing(false);
+      _submitLocked = false;
+    }, 3000);
   }
 
   // ── Snackbar ───────────────────────────────────────────────────────────
