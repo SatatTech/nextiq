@@ -27,40 +27,47 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nQuota Exceeded\nDuplicate Lead"
+   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nQuota Exceeded\nDuplicate Lead",
+   "read_only": 1
   },
   {
    "fieldname": "submitted_at",
    "fieldtype": "Datetime",
    "in_list_view": 1,
-   "label": "Submitted At"
+   "label": "Submitted At",
+   "read_only": 1
   },
   {
    "fieldname": "processed_at",
    "fieldtype": "Datetime",
-   "label": "Processed At"
+   "label": "Processed At",
+   "read_only": 1
   },
   {
    "fieldname": "lead",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Lead Created",
-   "options": "Lead"
+   "options": "Lead",
+   "read_only": 1
   },
   {
    "fieldname": "scans_remaining",
    "fieldtype": "Int",
-   "label": "Scans Remaining"
+   "label": "Scans Remaining",
+   "read_only": 1
   },
   {
    "fieldname": "error_message",
    "fieldtype": "Small Text",
-   "label": "Error Message"
+   "label": "Error Message",
+   "read_only": 1
   },
   {
    "fieldname": "merged_image",
    "fieldtype": "Attach",
-   "label": "Merged Card Image"
+   "label": "Merged Card Image",
+   "read_only": 1
   },
   {
    "fieldname": "job_id",
@@ -74,6 +81,7 @@
    "fieldtype": "Data",
    "label": "Callback Secret",
    "hidden": 1,
+   "read_only": 1,
    "description": "Single-use secret that verifies the callback is from nextiq_service. Cleared after use."
   },
   {
@@ -97,7 +105,8 @@
    "fieldname": "ai_response",
    "fieldtype": "Code",
    "label": "AI Response (JSON)",
-   "options": "JSON"
+   "options": "JSON",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_zpqw",

@@ -26,6 +26,25 @@ _MAX_FIELD_LEN = 500   # max characters per Lead field value
 _BLOCKED_HOSTS = frozenset({"metadata.google.internal", "169.254.169.254"})
 
 
+def _rate_limit(key, max_per_minute):
+	"""
+	Sliding-window rate limit via Redis INCR + EXPIRE.
+	Returns True (allow) or False (block).
+	Fails open if Redis is unavailable.
+	"""
+	try:
+		pipe = frappe.cache().redis_client.pipeline()
+		pipe.incr(key)
+		pipe.expire(key, 60)
+		count = pipe.execute()[0]
+		return count <= max_per_minute
+	except Exception:
+		frappe.logger("nextiq").warning(
+			f"Rate limit Redis check failed for key '{key}' — allowing (fail-open)"
+		)
+		return True
+
+
 def _validate_service_url(url):
 	"""
 	Block private/loopback IP targets in NextIQ Settings.service_url.
@@ -60,6 +79,13 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg"):
 	Returns immediately: {"log_name": str}
 	The browser can close after this — Lead is created via background + callback.
 	"""
+	# Rate limit: 10 scans per minute per user
+	if not _rate_limit(f"nextiq_scan:{frappe.session.user}", max_per_minute=10):
+		frappe.throw(
+			"Too many scan requests. Please wait a moment and try again.",
+			title="Rate Limited",
+		)
+
 	if "," in merged_image_base64:
 		merged_image_base64 = merged_image_base64.split(",")[1]
 
@@ -129,6 +155,12 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 	  - Comparison uses hmac.compare_digest to prevent timing attacks.
 	  - cb_secret is cleared from DB after first successful callback (prevents replay).
 	"""
+	# Rate limit: 60 callbacks per minute per IP — real service sends 1 per scan
+	remote_ip = (frappe.request.headers.get("X-Forwarded-For") or
+				 frappe.request.remote_addr or "unknown").split(",")[0].strip()
+	if not _rate_limit(f"nextiq_cb:{remote_ip}", max_per_minute=60):
+		return {"success": False, "error": "rate_limited"}
+
 	if not job_id or not cb_secret:
 		return {"success": False, "error": "missing_params"}
 
