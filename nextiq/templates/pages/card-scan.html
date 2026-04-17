@@ -1,282 +1,256 @@
 {% extends "templates/web.html" %}
 
-{% block title %}Scan Business Card | NextIQ{% endblock %}
+{% block title %}Card Scanner | NextIQ{% endblock %}
 
-{% block navbar %}{# hide navbar — full-screen scanner #}{% endblock %}
+{% block navbar %}{# hidden — full-screen scanner #}{% endblock %}
 
 {% block head_include %}
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
+*, *::before, *::after { box-sizing: border-box; }
 html, body {
-  margin: 0; padding: 0;
-  height: 100%; width: 100%;
-  overflow: hidden;
-  background: #000;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0; padding: 0; height: 100%; width: 100%;
+  overflow: hidden; background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 .web-footer, footer { display: none !important; }
 
-.scanner-root {
-  position: fixed;
-  inset: 0; z-index: 100;
-  overflow: hidden;
-  background: #000;
-}
-
+/* ── Root ─────────────────────────────────────────────────────────── */
+.scanner-root { position: fixed; inset: 0; z-index: 100; background: #111; }
 #video-main {
-  position: absolute;
-  inset: 0; width: 100%; height: 100%;
-  object-fit: cover;
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
 }
 
+/* ── Flash overlay ────────────────────────────────────────────────── */
 .capture-flash {
-  position: absolute;
-  inset: 0; background: #fff;
-  opacity: 0; pointer-events: none;
-  z-index: 10;
-  transition: opacity .08s;
+  position: absolute; inset: 0; background: #fff;
+  opacity: 0; pointer-events: none; z-index: 10;
+  transition: opacity .07s;
 }
-.capture-flash.active { opacity: .65; }
+.capture-flash.active { opacity: .4; }
 
-.scan-overlay { position: absolute; inset: 0; pointer-events: none; }
+/* ── Header ───────────────────────────────────────────────────────── */
+.header {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+  padding: calc(env(safe-area-inset-top,0px) + 14px) 18px 0;
+  display: flex; align-items: center; justify-content: flex-end;
+}
+.btn-flash {
+  height: 36px; padding: 0 12px 0 10px;
+  border-radius: 50px;
+  background: rgba(0,0,0,.32); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.08);
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+.btn-flash svg {
+  width: 16px; height: 16px; fill: none; flex-shrink: 0;
+  stroke: rgba(255,255,255,.65); stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: stroke .2s;
+}
+.btn-flash span {
+  font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.6); white-space: nowrap;
+  transition: color .2s;
+}
+.btn-flash.on { background: rgba(251,191,36,.18); border-color: rgba(251,191,36,.3); }
+.btn-flash.on svg { stroke: #fbbf24; }
+.btn-flash.on span { color: #fbbf24; }
 
+/* ── Tab switcher ─────────────────────────────────────────────────── */
+.tab-row {
+  position: absolute;
+  top: calc(env(safe-area-inset-top,0px) + 62px);
+  left: 50%; transform: translateX(-50%);
+  z-index: 30;
+  background: rgba(0,0,0,.36);
+  backdrop-filter: blur(16px);
+  border-radius: 50px;
+  padding: 3px;
+  display: flex;
+  border: 1px solid rgba(255,255,255,.1);
+  white-space: nowrap;
+}
+.tab-slider {
+  position: absolute;
+  top: 3px; bottom: 3px;
+  border-radius: 50px;
+  background: #fff;
+  transition: left .32s cubic-bezier(.4,0,.2,1), width .32s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.tab-pill {
+  padding: 7px 22px;
+  font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.5);
+  cursor: pointer; border-radius: 50px;
+  position: relative; z-index: 1;
+  transition: color .28s;
+  user-select: none;
+}
+.tab-pill.active { color: #111; }
+
+/* ── Scan overlay ─────────────────────────────────────────────────── */
+.scan-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+
+/* ── Card frame ───────────────────────────────────────────────────── */
 .card-frame {
   position: absolute;
   top: 50%; left: 50%;
-  transform: translate(-50%, -54%);
-  width: 88vw;
-  max-width: 360px;
+  transform: translate(-50%, -50%);
+  width: min(86vw, 340px);
   aspect-ratio: 1.586;
-  border-radius: 12px;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,.62);
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.7);
+  overflow: visible;
 }
 
-.card-frame::before,
-.card-frame::after,
-.card-frame .corner-bl,
-.card-frame .corner-br {
-  content: "";
+/* Corner brackets — no full border, just L-shaped corners */
+.corner {
+  position: absolute; width: 26px; height: 26px;
+  border: 2.5px solid rgba(255,255,255,.75);
+  transition: border-color .35s, box-shadow .35s;
+}
+.c-tl { top: -10px; left: -10px;  border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; }
+.c-tr { top: -10px; right: -10px; border-left: 0;  border-bottom: 0; border-radius: 0 16px 0 0; }
+.c-bl { bottom: -10px; left: -10px;  border-right: 0; border-top: 0; border-radius: 0 0 0 16px; }
+.c-br { bottom: -10px; right: -10px; border-left: 0;  border-top: 0; border-radius: 0 0 16px 0; }
+
+.card-frame:not(.steady) .corner { animation: blink 2.4s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:.8} 50%{opacity:.2} }
+
+.card-frame.steady .corner {
+  border-color: #818cf8;
+  box-shadow: 0 0 12px rgba(129,140,248,.6);
+  animation: none; opacity: 1;
+}
+
+/* ── Scan line (always active, smooth) ────────────────────────────── */
+.scan-line {
+  position: absolute; left: 4%; right: 4%; height: 1.5px;
+  background: linear-gradient(
+    to right,
+    transparent 0%, rgba(255,255,255,0) 8%,
+    rgba(255,255,255,.55) 40%, rgba(255,255,255,.8) 50%,
+    rgba(255,255,255,.55) 60%, rgba(255,255,255,0) 92%,
+    transparent 100%
+  );
+  pointer-events: none; opacity: 0;
+}
+.card-frame.scanning .scan-line {
+  animation: scan-move 2.6s cubic-bezier(.45,.05,.55,.95) infinite;
+}
+@keyframes scan-move {
+  0%   { top: 6%;  opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { top: 92%; opacity: 0; }
+}
+
+/* ── Status text below frame ──────────────────────────────────────── */
+.status-text {
   position: absolute;
-  width: 22px; height: 22px;
-  border: 3px solid #fff;
-  transition: border-color .3s;
-}
-.card-frame.steady::before,
-.card-frame.steady::after,
-.card-frame.steady .corner-bl,
-.card-frame.steady .corner-br { border-color: #4ade80; }
-
-.card-frame::before  { top:-2px; left:-2px;   border-right:0; border-bottom:0; border-radius:6px 0 0 0; }
-.card-frame::after   { top:-2px; right:-2px;  border-left:0;  border-bottom:0; border-radius:0 6px 0 0; }
-.card-frame .corner-bl { bottom:-2px; left:-2px;  border-right:0; border-top:0;    border-radius:0 0 0 6px; }
-.card-frame .corner-br { bottom:-2px; right:-2px; border-left:0;  border-top:0;    border-radius:0 0 6px 0; }
-
-.card-frame:not(.steady)::before,
-.card-frame:not(.steady)::after,
-.card-frame:not(.steady) .corner-bl,
-.card-frame:not(.steady) .corner-br {
-  animation: corner-pulse 2s ease-in-out infinite;
-}
-@keyframes corner-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-
-.frame-hint {
-  position: absolute;
-  bottom: -30px; left: 0; right: 0;
+  bottom: -40px; left: -30%; right: -30%;
   text-align: center;
-  color: rgba(255,255,255,.75);
-  font-size: 12px; font-weight: 500;
+  color: rgba(255,255,255,.5);
+  font-size: 12.5px; font-weight: 500; letter-spacing: .05px;
 }
 
-.top-bar {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  padding: calc(env(safe-area-inset-top,0px) + 14px) 16px 12px;
-  display: flex; align-items: center; gap: 10px;
-  background: linear-gradient(to bottom, rgba(0,0,0,.55) 0%, transparent 100%);
-  pointer-events: none;
-}
-.step-pill {
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.3);
-  backdrop-filter: blur(8px);
-  color: #fff; font-size: 11px; font-weight: 700;
-  padding: 4px 10px; border-radius: 20px;
-  letter-spacing: .5px; text-transform: uppercase; white-space: nowrap;
-}
-.step-title {
-  color: #fff; font-size: 14px; font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0,0,0,.6);
-}
-
-.front-pip {
-  position: absolute;
-  top: calc(env(safe-area-inset-top,0px) + 58px);
-  right: 14px;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.front-pip img {
-  width: 64px; height: 40px;
-  object-fit: cover;
-  border-radius: 6px;
-  border: 2px solid rgba(255,255,255,.7);
-  box-shadow: 0 2px 8px rgba(0,0,0,.4);
-}
-.front-pip-label {
-  color: #fff; font-size: 9px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .5px;
-  background: rgba(40,167,69,.85);
-  padding: 2px 6px; border-radius: 4px;
-}
-
+/* ── Bottom bar ───────────────────────────────────────────────────── */
 .bottom-bar {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
-  padding-bottom: calc(env(safe-area-inset-bottom,0px) + 28px);
-  padding-top: 16px;
-  background: linear-gradient(to top, rgba(0,0,0,.65) 0%, transparent 100%);
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  bottom: calc(env(safe-area-inset-bottom,0px) + 32px);
+  left: 32px; right: 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  z-index: 30;
 }
 
-.auto-scan-row {
-  display: flex; align-items: center; gap: 8px;
-}
-.toggle-switch {
-  position: relative; width: 40px; height: 22px; flex-shrink: 0;
-}
-.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-.toggle-track {
-  position: absolute; inset: 0;
-  border-radius: 11px;
-  background: rgba(255,255,255,.25);
-  cursor: pointer;
-  transition: background .25s;
-}
-.toggle-track::before {
-  content: "";
-  position: absolute;
-  width: 16px; height: 16px;
-  left: 3px; bottom: 3px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform .25s;
-  box-shadow: 0 1px 4px rgba(0,0,0,.3);
-}
-.toggle-switch input:checked + .toggle-track { background: #4ade80; }
-.toggle-switch input:checked + .toggle-track::before { transform: translateX(18px); }
-.toggle-label {
-  color: rgba(255,255,255,.85);
-  font-size: 12px; font-weight: 600; letter-spacing: .3px;
-  cursor: pointer; user-select: none;
-}
-
-.btn-retake {
-  background: rgba(255,255,255,.15);
-  border: 1px solid rgba(255,255,255,.3);
-  backdrop-filter: blur(6px);
-  color: #fff; padding: 7px 18px;
-  border-radius: 20px; font-size: 13px; font-weight: 600;
-  cursor: pointer;
-  transition: background .2s, opacity .3s, transform .3s;
-  opacity: 0; pointer-events: none;
-  transform: translateY(6px);
-}
-.btn-retake.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
-.btn-retake:hover { background: rgba(255,255,255,.25); }
-
-.shutter-wrap {
-  position: relative;
-  width: 84px; height: 84px;
+/* Left slot: gallery picker or captured front thumbnail */
+.thumb-slot {
+  width: 66px; height: 42px; border-radius: 8px;
+  background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.14);
+  overflow: hidden; cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+  transition: transform .1s, opacity .2s;
 }
-.countdown-svg {
-  position: absolute;
-  inset: 0; width: 100%; height: 100%;
-  transform: rotate(-90deg);
-  pointer-events: none;
+.thumb-slot:active { transform: scale(.9); }
+.thumb-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-slot svg {
+  width: 20px; height: 20px; fill: none;
+  stroke: rgba(255,255,255,.38); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
 }
-.ring-track { fill: none; stroke: rgba(255,255,255,.15); stroke-width: 3.5; }
-.ring-fill  {
-  fill: none; stroke: #4ade80; stroke-width: 3.5;
-  stroke-linecap: round;
-  stroke-dasharray: 238.76;
-  stroke-dashoffset: 238.76;
-  transition: stroke-dashoffset .18s linear;
-}
+
+/* Center: capture button */
 .shutter-btn {
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  border: 4px solid rgba(255,255,255,.9);
-  background: transparent;
-  cursor: pointer;
+  width: 66px; height: 66px; border-radius: 50%;
+  background: #fff; border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: transform .12s, border-color .3s;
-  z-index: 1;
-}
-.shutter-btn:active { transform: scale(.91); }
-.shutter-inner {
-  width: 54px; height: 54px;
-  border-radius: 50%; background: #fff;
-  transition: background .2s, transform .12s;
-}
-.shutter-btn:active .shutter-inner { background: #d4d4d4; transform: scale(.94); }
-.shutter-btn.steady { border-color: #4ade80; }
-.shutter-btn.steady .shutter-inner { background: #4ade80; }
-
-.capture-label {
-  color: rgba(255,255,255,.65);
-  font-size: 11px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: .6px;
-}
-
-.shutter-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 28px; width: 100%;
-  padding: 0 40px;
-}
-.btn-gallery {
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.15);
-  border: 1.5px solid rgba(255,255,255,.35);
-  backdrop-filter: blur(6px);
-  color: #fff; font-size: 20px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  transition: background .2s, transform .1s;
   flex-shrink: 0;
+  box-shadow: 0 0 0 5px rgba(255,255,255,.18), 0 4px 22px rgba(0,0,0,.35);
+  transition: transform .1s, background .3s, box-shadow .3s;
 }
-.btn-gallery:active { transform: scale(.92); background: rgba(255,255,255,.28); }
-.btn-gallery:disabled { opacity: .35; pointer-events: none; }
-.shutter-btn:disabled { opacity: .35; pointer-events: none; }
+.shutter-btn:active { transform: scale(.87); }
+.shutter-btn:disabled { opacity: .4; pointer-events: none; }
+.shutter-btn.steady {
+  background: #818cf8;
+  box-shadow: 0 0 0 5px rgba(129,140,248,.22), 0 4px 22px rgba(129,140,248,.45);
+}
+.shutter-inner {
+  width: 53px; height: 53px; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.1);
+}
 
-/* ── Snackbar ── */
-.snackbar {
+/* Right: redo button */
+.btn-redo {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.14);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s, transform .1s;
+}
+.btn-redo.visible { opacity: 1; pointer-events: auto; }
+.btn-redo:active { transform: scale(.88); }
+.btn-redo svg {
+  width: 19px; height: 19px; fill: none;
+  stroke: rgba(255,255,255,.65); stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Toast ────────────────────────────────────────────────────────── */
+.toast {
   position: fixed;
-  bottom: 32px; left: 50%;
-  transform: translateX(-50%) translateY(90px);
-  min-width: 260px; max-width: 88vw;
-  background: rgba(20,20,20,.95);
-  backdrop-filter: blur(14px);
-  color: #fff; padding: 13px 18px;
-  border-radius: 14px;
-  font-size: 14px; font-weight: 500;
-  box-shadow: 0 8px 30px rgba(0,0,0,.35);
-  display: flex; align-items: flex-start; gap: 10px;
-  opacity: 0;
-  transition: opacity .3s, transform .4s cubic-bezier(.34,1.56,.64,1);
+  top: calc(env(safe-area-inset-top,0px) + 16px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  background: rgba(20,20,28,.92); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.08);
+  color: #fff; padding: 8px 16px; border-radius: 50px;
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 7px;
+  opacity: 0; white-space: nowrap;
+  transition: opacity .2s, transform .25s cubic-bezier(.34,1.3,.64,1);
   z-index: 9999; pointer-events: none;
 }
-.snackbar.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.snackbar.error { background: rgba(132,32,41,.96); }
-.snackbar.warning { background: rgba(133,77,14,.96); }
-.snackbar.processing { background: rgba(30,64,175,.96); }
-.sb-icon { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
-.sb-body { display: flex; flex-direction: column; gap: 2px; }
-.sb-text { font-weight: 600; }
-.sb-sub  { font-size: 12px; opacity: .8; font-weight: 400; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,.3);
+  position: relative; top: 0; align-self: center;
+  display: inline-block;
+}
+.toast.is-success .toast-dot { background: #34d399; }
+.toast.is-error   .toast-dot { background: #f87171; }
+.toast.is-info    .toast-dot { background: #818cf8; }
+.toast-sub { display: none; }
 </style>
 {% endblock %}
 
@@ -286,65 +260,63 @@ html, body {
   <video id="video-main" autoplay playsinline muted></video>
   <div class="capture-flash" id="capture-flash"></div>
 
+  <!-- Header: flash toggle only -->
+  <div class="header">
+    <button class="btn-flash" id="btn-flash" aria-label="Toggle auto scan">
+      <svg viewBox="0 0 24 24"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span>Auto Scan</span>
+    </button>
+  </div>
+
+  <!-- Tab row: Front Side / Back Side -->
+  <div class="tab-row" id="tab-row">
+    <div class="tab-slider" id="tab-slider"></div>
+    <div class="tab-pill active" id="tab-front">Front Side</div>
+    <div class="tab-pill"        id="tab-back">Back Side</div>
+  </div>
+
+  <!-- Scan overlay: frame + corners + scan line -->
   <div class="scan-overlay">
     <div class="card-frame" id="card-frame">
-      <div class="corner-bl"></div>
-      <div class="corner-br"></div>
-      <div class="frame-hint" id="frame-hint">Align front of business card</div>
+      <div class="corner c-tl"></div>
+      <div class="corner c-tr"></div>
+      <div class="corner c-bl"></div>
+      <div class="corner c-br"></div>
+      <div class="scan-line"></div>
+      <div class="status-text" id="status-text">Align front of business card</div>
     </div>
   </div>
 
-  <div class="top-bar">
-    <div class="step-pill" id="step-pill">STEP 1 / 2</div>
-    <div class="step-title" id="step-title">Capture Front Side</div>
-  </div>
-
-  <div class="front-pip" id="front-pip">
-    <img id="pip-img" src="" alt="front">
-    <div class="front-pip-label">Front ✓</div>
-  </div>
-
+  <!-- Bottom bar: thumbnail | shutter | redo -->
   <div class="bottom-bar">
 
-    <div class="auto-scan-row">
-      <label class="toggle-switch" id="toggle-label">
-        <input type="checkbox" id="auto-scan-check">
-        <span class="toggle-track"></span>
-      </label>
-      <span class="toggle-label" onclick="document.getElementById('auto-scan-check').click()">Auto Scan</span>
+    <div class="thumb-slot" id="thumb-slot">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
     </div>
 
-    <button class="btn-retake" id="btn-retake">↩ Redo Front Side</button>
+    <button class="shutter-btn" id="btn-shutter" aria-label="Capture">
+      <div class="shutter-inner"></div>
+    </button>
 
-    <div class="shutter-row">
-      <button class="btn-gallery" id="btn-gallery" aria-label="Choose from gallery">🖼️</button>
+    <button class="btn-redo" id="btn-redo" aria-label="Redo front side">
+      <svg viewBox="0 0 24 24">
+        <polyline points="1 4 1 10 7 10"/>
+        <path d="M3.51 15a9 9 0 1 0 .49-3.32"/>
+      </svg>
+    </button>
 
-      <div class="shutter-wrap">
-        <svg class="countdown-svg" viewBox="0 0 84 84">
-          <circle class="ring-track" cx="42" cy="42" r="38"/>
-          <circle class="ring-fill" id="ring-fill" cx="42" cy="42" r="38"/>
-        </svg>
-        <button class="shutter-btn" id="btn-shutter" aria-label="Capture">
-          <div class="shutter-inner"></div>
-        </button>
-      </div>
-
-      <div style="width:48px;flex-shrink:0;"></div>
-    </div>
-
-    <div class="capture-label" id="capture-label">Tap to capture</div>
-
-    <input type="file" id="gallery-input" accept="image/*"
-           style="display:none;" aria-hidden="true">
   </div>
+
+  <input type="file" id="gallery-input" accept="image/*" style="display:none" aria-hidden="true">
 </div>
 
-<div class="snackbar" id="snackbar">
-  <span class="sb-icon" id="sb-icon">✅</span>
-  <div class="sb-body">
-    <span class="sb-text" id="sb-text">Processing…</span>
-    <span class="sb-sub"  id="sb-sub"></span>
-  </div>
+<div class="toast" id="toast">
+  <span class="toast-dot" id="toast-dot"></span>
+  <span class="toast-text" id="toast-text"></span>
 </div>
 {% endblock %}
 
@@ -353,36 +325,48 @@ html, body {
 (function () {
   "use strict";
 
-  // ── State ──────────────────────────────────────────────────────────────
-  let frontDataURL  = null;
-  let mediaStream   = null;
-  let step          = 1;
-  let autoScanOn    = localStorage.getItem("nextiq_autoscan") !== "false";
-  let scanInterval  = null;
-  let prevSample    = null;
-  let steadyCount   = 0;
+  // ── State ─────────────────────────────────────────────────────────────
+  let frontDataURL = null;
+  let mediaStream  = null;
+  let step         = 1;
+  let scanInterval = null;
+  let prevSample   = null;
+  let steadyCount  = 0;
+  // Auto-scan defaults OFF — flash icon is the toggle
+  let autoScanOn   = localStorage.getItem("nextiq_autoscan") === "true";
 
-  const SAMPLE_MS      = 200;
-  const STEADY_NEEDED  = 10;
-  const STABLE_THRESH  = 8;
-  const RING_CIRC      = 238.76;
+  const SAMPLE_MS     = 200;
+  const STEADY_NEEDED = 10;
+  const STABLE_THRESH = 8;
 
-  // ── DOM ────────────────────────────────────────────────────────────────
-  const video        = document.getElementById("video-main");
-  const cardFrame    = document.getElementById("card-frame");
-  const frameHint    = document.getElementById("frame-hint");
-  const stepPill     = document.getElementById("step-pill");
-  const stepTitle    = document.getElementById("step-title");
-  const frontPip     = document.getElementById("front-pip");
-  const pipImg       = document.getElementById("pip-img");
-  const btnRetake    = document.getElementById("btn-retake");
-  const btnShutter   = document.getElementById("btn-shutter");
-  const captureLabel = document.getElementById("capture-label");
-  const ringFill     = document.getElementById("ring-fill");
-  const flashEl      = document.getElementById("capture-flash");
-  const autoCheck    = document.getElementById("auto-scan-check");
+  // ── DOM ───────────────────────────────────────────────────────────────
+  const video      = document.getElementById("video-main");
+  const cardFrame  = document.getElementById("card-frame");
+  const statusText = document.getElementById("status-text");
+  const tabFront   = document.getElementById("tab-front");
+  const tabBack    = document.getElementById("tab-back");
+  const tabSlider  = document.getElementById("tab-slider");
+  const thumbSlot  = document.getElementById("thumb-slot");
+  const btnShutter = document.getElementById("btn-shutter");
+  const btnRedo    = document.getElementById("btn-redo");
+  const btnFlash = document.getElementById("btn-flash");
+  const flashEl  = document.getElementById("capture-flash");
 
-  // ── Camera ─────────────────────────────────────────────────────────────
+  // ── Tab slider ────────────────────────────────────────────────────────
+  function slideTabTo(pill) {
+    const rowRect  = document.getElementById("tab-row").getBoundingClientRect();
+    const pillRect = pill.getBoundingClientRect();
+    tabSlider.style.left  = (pillRect.left - rowRect.left) + "px";
+    tabSlider.style.width = pillRect.width + "px";
+  }
+
+  function setActiveTab(which) {
+    tabFront.classList.toggle("active", which === "front");
+    tabBack.classList.toggle("active",  which === "back");
+    slideTabTo(which === "front" ? tabFront : tabBack);
+  }
+
+  // ── Camera ────────────────────────────────────────────────────────────
   async function startCamera() {
     stopCamera();
     const tries = [
@@ -398,23 +382,35 @@ html, body {
         return;
       } catch (_) {}
     }
-    showSnackbar("Camera not available — allow access and reload", "error");
+    showToast("Camera unavailable", "error", 0);
   }
 
   function stopCamera() {
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   }
 
-  // ── Crop to card frame ─────────────────────────────────────────────────
+  // ── Auto-scan toggle (flash icon) ─────────────────────────────────────
+  btnFlash.classList.toggle("on", autoScanOn);
+  btnFlash.addEventListener("click", () => {
+    autoScanOn = !autoScanOn;
+    localStorage.setItem("nextiq_autoscan", String(autoScanOn));
+    btnFlash.classList.toggle("on", autoScanOn);
+    autoScanOn ? startHeuristic() : stopHeuristic();
+  });
+
+  // ── Crop to card frame ────────────────────────────────────────────────
   function screenRectToVideo(rect) {
-    const vw = video.videoWidth  || 1280;
-    const vh = video.videoHeight || 720;
-    const sw = window.innerWidth;
-    const sh = window.innerHeight;
-    const scale = Math.max(sw / vw, sh / vh);
-    const ox = (vw * scale - sw) / 2;
-    const oy = (vh * scale - sh) / 2;
-    return { x: (rect.left + ox) / scale, y: (rect.top + oy) / scale, w: rect.width / scale, h: rect.height / scale };
+    const vw    = video.videoWidth  || 1280;
+    const vh    = video.videoHeight || 720;
+    const scale = Math.max(window.innerWidth / vw, window.innerHeight / vh);
+    const ox    = (vw * scale - window.innerWidth)  / 2;
+    const oy    = (vh * scale - window.innerHeight) / 2;
+    return {
+      x: (rect.left + ox) / scale,
+      y: (rect.top  + oy) / scale,
+      w: rect.width  / scale,
+      h: rect.height / scale,
+    };
   }
 
   function cropToCardFrame() {
@@ -430,19 +426,22 @@ html, body {
     return cv.toDataURL("image/jpeg", 0.92);
   }
 
-  // ── Steady-frame detection ─────────────────────────────────────────────
+  // ── Steady-frame detection ────────────────────────────────────────────
   const sampleCv  = document.createElement("canvas");
-  sampleCv.width  = 120;
-  sampleCv.height = 75;
+  sampleCv.width  = 120; sampleCv.height = 75;
   const sampleCtx = sampleCv.getContext("2d");
-  const SW = 120, SH = 75;
 
   function getSampleData() {
     const rect = cardFrame.getBoundingClientRect();
     const vr   = screenRectToVideo(rect);
     const pad  = 0.05;
-    sampleCtx.drawImage(video, vr.x + vr.w * pad, vr.y + vr.h * pad, vr.w * (1 - 2*pad), vr.h * (1 - 2*pad), 0, 0, SW, SH);
-    return sampleCtx.getImageData(0, 0, SW, SH);
+    sampleCtx.drawImage(
+      video,
+      vr.x + vr.w*pad, vr.y + vr.h*pad,
+      vr.w*(1-2*pad),  vr.h*(1-2*pad),
+      0, 0, 120, 75
+    );
+    return sampleCtx.getImageData(0, 0, 120, 75);
   }
 
   function analyseFrame(imgData) {
@@ -451,36 +450,30 @@ html, body {
     let sumR = 0, sumG = 0, sumB = 0;
     for (let i = 0; i < g.length; i++) {
       const p = i * 4;
-      g[i] = (d[p] * 0.299 + d[p+1] * 0.587 + d[p+2] * 0.114) | 0;
+      g[i] = (d[p]*0.299 + d[p+1]*0.587 + d[p+2]*0.114) | 0;
       sumR += d[p]; sumG += d[p+1]; sumB += d[p+2];
     }
-    const EDGE_THRESH = 28;
-    let edgeCount = 0;
+    const ET = 28; let edgeCount = 0;
     for (let y = 1; y < h-1; y++) {
       for (let x = 1; x < w-1; x++) {
-        const tl=g[(y-1)*w+(x-1)], tc=g[(y-1)*w+x], tr=g[(y-1)*w+(x+1)];
-        const ml=g[y*w+(x-1)],                        mr=g[y*w+(x+1)];
-        const bl=g[(y+1)*w+(x-1)], bc=g[(y+1)*w+x], br=g[(y+1)*w+(x+1)];
-        const gx = -tl - 2*ml - bl + tr + 2*mr + br;
-        const gy = -tl - 2*tc - tr + bl + 2*bc + br;
-        if ((gx*gx + gy*gy) > EDGE_THRESH * EDGE_THRESH) edgeCount++;
+        const tl=g[(y-1)*w+(x-1)], tc=g[(y-1)*w+x],   tr=g[(y-1)*w+(x+1)];
+        const ml=g[y    *w+(x-1)],                      mr=g[y    *w+(x+1)];
+        const bl=g[(y+1)*w+(x-1)], bc=g[(y+1)*w+x],   br=g[(y+1)*w+(x+1)];
+        const gx = -tl-2*ml-bl+tr+2*mr+br;
+        const gy = -tl-2*tc-tr+bl+2*bc+br;
+        if (gx*gx + gy*gy > ET*ET) edgeCount++;
       }
     }
     const n = g.length;
-    return { edgeDensity: edgeCount / ((w-2)*(h-2)), avgR: sumR/n, avgG: sumG/n, avgB: sumB/n };
+    return { edgeDensity: edgeCount/((w-2)*(h-2)), avgR: sumR/n, avgG: sumG/n, avgB: sumB/n };
   }
-
-  const CARD_EDGE_THRESH = 0.05;
 
   function isStable(a, b) {
-    return (Math.abs(a.avgR - b.avgR) + Math.abs(a.avgG - b.avgG) + Math.abs(a.avgB - b.avgB)) / 3 < STABLE_THRESH;
+    return (Math.abs(a.avgR-b.avgR) + Math.abs(a.avgG-b.avgG) + Math.abs(a.avgB-b.avgB)) / 3 < STABLE_THRESH;
   }
-
-  function setRingProgress(f) { ringFill.style.strokeDashoffset = (RING_CIRC * (1 - f)).toFixed(2); }
 
   function resetSteady() {
     steadyCount = 0; prevSample = null;
-    setRingProgress(0);
     cardFrame.classList.remove("steady");
     btnShutter.classList.remove("steady");
   }
@@ -488,23 +481,28 @@ html, body {
   function startHeuristic() {
     if (scanInterval) return;
     resetSteady();
+    cardFrame.classList.add("scanning");
     scanInterval = setInterval(() => {
       if (!video.videoWidth) return;
       try {
-        const imgData = getSampleData();
-        const cur     = analyseFrame(imgData);
-        if (cur.edgeDensity < CARD_EDGE_THRESH) {
-          resetSteady();
-          frameHint.textContent = step === 1 ? "Align front of business card" : "Flip card — align back side";
-          prevSample = null;
+        const cur = analyseFrame(getSampleData());
+        if (cur.edgeDensity < 0.05) {
+          resetSteady(); prevSample = null;
+          statusText.textContent = step === 1 ? "Align front of business card" : "Flip — align back side";
           return;
         }
         if (prevSample && isStable(cur, prevSample)) {
           steadyCount++;
-          setRingProgress(steadyCount / STEADY_NEEDED);
-          if (steadyCount >= 2) { cardFrame.classList.add("steady"); btnShutter.classList.add("steady"); frameHint.textContent = "Hold steady…"; }
+          if (steadyCount >= 2) {
+            cardFrame.classList.add("steady");
+            btnShutter.classList.add("steady");
+            statusText.textContent = "Hold steady…";
+          }
           if (steadyCount >= STEADY_NEEDED) { stopHeuristic(); doCapture(); }
-        } else { steadyCount = 0; setRingProgress(0); frameHint.textContent = "Hold steady…"; }
+        } else {
+          steadyCount = 0;
+          statusText.textContent = "Hold steady…";
+        }
         prevSample = cur;
       } catch (_) {}
     }, SAMPLE_MS);
@@ -512,49 +510,64 @@ html, body {
 
   function stopHeuristic() {
     if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    cardFrame.classList.remove("scanning");
     resetSteady();
   }
 
   // ── Flash ──────────────────────────────────────────────────────────────
   function flashCapture() {
     flashEl.classList.add("active");
-    setTimeout(() => flashEl.classList.remove("active"), 120);
+    setTimeout(() => flashEl.classList.remove("active"), 90);
   }
 
   // ── Capture ────────────────────────────────────────────────────────────
   function doCapture() {
     flashCapture();
-    if (step === 1) { frontDataURL = cropToCardFrame(); goToStep2(); }
-    else { const backURL = cropToCardFrame(); submitInBackground(frontDataURL, backURL); frontDataURL = null; goToStep1(); }
+    if (step === 1) {
+      frontDataURL = cropToCardFrame();
+      goToStep2();
+    } else {
+      const backURL = cropToCardFrame();
+      submitInBackground(frontDataURL, backURL);
+      frontDataURL = null;
+      goToStep1();
+    }
   }
 
   // ── Step transitions ───────────────────────────────────────────────────
   function goToStep1() {
     step = 1;
-    stepPill.textContent  = "STEP 1 / 2";
-    stepTitle.textContent = "Capture Front Side";
-    frameHint.textContent = "Align front of business card";
-    captureLabel.textContent = "Tap to capture";
-    frontPip.style.display = "none";
-    btnRetake.classList.remove("visible");
-    if (autoScanOn) startHeuristic(); else resetSteady();
+    statusText.textContent = "Align front of business card";
+    setActiveTab("front");
+    // Reset thumb slot back to gallery icon
+    thumbSlot.innerHTML = `<svg viewBox="0 0 24 24">
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/>
+      <polyline points="21 15 16 10 5 21"/>
+    </svg>`;
+    thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
+    btnRedo.classList.remove("visible");
+    autoScanOn ? startHeuristic() : resetSteady();
   }
 
   function goToStep2() {
     step = 2;
-    stepPill.textContent  = "STEP 2 / 2";
-    stepTitle.textContent = "Capture Back Side";
-    frameHint.textContent = "Flip card — align back side";
-    captureLabel.textContent = "Tap to capture";
-    pipImg.src = frontDataURL;
-    frontPip.style.display = "flex";
-    btnRetake.classList.add("visible");
-    if (autoScanOn) startHeuristic(); else resetSteady();
+    statusText.textContent = "Flip — align back side";
+    setActiveTab("back");
+    // Show captured front image in thumb slot
+    const img = new Image();
+    img.src = frontDataURL;
+    thumbSlot.innerHTML = "";
+    thumbSlot.appendChild(img);
+    thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
+    btnRedo.classList.add("visible");
+    autoScanOn ? startHeuristic() : resetSteady();
   }
 
-  // ── Image compression ──────────────────────────────────────────────────
-  const MAX_CARD_PX = 900, MAX_BYTES = 900_000;
-  const QUALITY_STEPS = [0.82, 0.72, 0.62], MIN_QUALITY = 0.62;
+  // ── Image compression + merge ──────────────────────────────────────────
+  const MAX_PX    = 900;
+  const MAX_BYTES = 900_000;
+  const QUALITIES = [0.82, 0.72, 0.62];
 
   function loadScaled(dataURL, maxPx) {
     return new Promise((resolve, reject) => {
@@ -562,113 +575,89 @@ html, body {
       img.onerror = reject;
       img.onload = () => {
         let w = img.naturalWidth, h = img.naturalHeight;
-        if (w > maxPx || h > maxPx) { const r = Math.min(maxPx/w, maxPx/h); w = Math.round(w*r); h = Math.round(h*r); }
+        if (w > maxPx || h > maxPx) { const r = Math.min(maxPx/w, maxPx/h); w=Math.round(w*r); h=Math.round(h*r); }
         resolve({ img, w, h });
       };
       img.src = dataURL;
     });
   }
 
-  function dataURLBytes(d) { const b = (d.split(",")[1]||""); const p = (b.match(/=+$/)||[""])[0].length; return Math.floor(b.length*3/4)-p; }
+  function b64Bytes(d) {
+    const b = (d.split(",")[1] || "");
+    return Math.floor(b.length * 3/4) - (b.match(/=+$/) || [""])[0].length;
+  }
 
   async function mergeImages(frontURL, backURL) {
-    const [f, b] = await Promise.all([loadScaled(frontURL, MAX_CARD_PX), loadScaled(backURL, MAX_CARD_PX)]);
-    const GAP=20, PAD=10, LABEL=26;
-    const cv = document.createElement("canvas");
+    const [f, b] = await Promise.all([loadScaled(frontURL, MAX_PX), loadScaled(backURL, MAX_PX)]);
+    const GAP=20, PAD=10, LH=26;
+    const cv  = document.createElement("canvas");
     cv.width  = f.w + GAP + b.w + PAD*2;
-    cv.height = Math.max(f.h, b.h) + PAD*2 + LABEL;
+    cv.height = Math.max(f.h, b.h) + PAD*2 + LH;
     const ctx = cv.getContext("2d");
     ctx.fillStyle = "#f8f9fa"; ctx.fillRect(0,0,cv.width,cv.height);
-    ctx.fillStyle = "#555"; ctx.font = "bold 18px Arial, sans-serif";
-    ctx.fillText("FRONT", PAD, LABEL-6); ctx.fillText("BACK", PAD+f.w+GAP, LABEL-6);
-    ctx.drawImage(f.img, 0,0,f.img.naturalWidth,f.img.naturalHeight, PAD, LABEL+PAD, f.w, f.h);
-    ctx.drawImage(b.img, 0,0,b.img.naturalWidth,b.img.naturalHeight, PAD+f.w+GAP, LABEL+PAD, b.w, b.h);
-    let result, bytes = Infinity;
-    for (const q of QUALITY_STEPS) { result = cv.toDataURL("image/jpeg", q); bytes = dataURLBytes(result); if (bytes <= MAX_BYTES) break; }
-    if (bytes > MAX_BYTES) { const cv2=document.createElement("canvas"); cv2.width=Math.round(cv.width/2); cv2.height=Math.round(cv.height/2); cv2.getContext("2d").drawImage(cv,0,0,cv2.width,cv2.height); result=cv2.toDataURL("image/jpeg",MIN_QUALITY); }
+    ctx.fillStyle = "#555"; ctx.font = "bold 18px Arial,sans-serif";
+    ctx.fillText("FRONT", PAD, LH-6);
+    ctx.fillText("BACK",  PAD+f.w+GAP, LH-6);
+    ctx.drawImage(f.img, 0,0,f.img.naturalWidth,f.img.naturalHeight, PAD,          LH+PAD, f.w, f.h);
+    ctx.drawImage(b.img, 0,0,b.img.naturalWidth,b.img.naturalHeight, PAD+f.w+GAP,  LH+PAD, b.w, b.h);
+    let result;
+    for (const q of QUALITIES) {
+      result = cv.toDataURL("image/jpeg", q);
+      if (b64Bytes(result) <= MAX_BYTES) break;
+    }
+    if (b64Bytes(result) > MAX_BYTES) {
+      const cv2 = document.createElement("canvas");
+      cv2.width  = Math.round(cv.width/2); cv2.height = Math.round(cv.height/2);
+      cv2.getContext("2d").drawImage(cv, 0, 0, cv2.width, cv2.height);
+      result = cv2.toDataURL("image/jpeg", 0.62);
+    }
     return result;
   }
 
-  function setProcessing(on) {
-    btnShutter.disabled = on;
-    document.getElementById("btn-gallery").disabled = on;
-    captureLabel.textContent = on ? "Processing…" : "Tap to capture";
-  }
-
-  // ── Submit (fire and forget) ───────────────────────────────────────────
-  // After submit the browser does nothing more — Lead is created in the
-  // background and the user is notified by email when it is ready.
-  let _submitLocked = false;
+  // ── Submit ─────────────────────────────────────────────────────────────
+  let _locked = false;
 
   async function submitInBackground(frontURL, backURL) {
-    if (_submitLocked) return;
-    _submitLocked = true;
-
-    // Disable shutter briefly to prevent accidental double-tap
-    setProcessing(true);
-    showSnackbar("Uploading card…", "processing", "");
-
+    if (_locked) return;
+    _locked = true;
+    btnShutter.disabled = true;
+    showToast("Uploading…", "info", 8000);
     try {
       const merged = await mergeImages(frontURL, backURL);
       await frappe.xcall("nextiq.api.submit_card_scan", {
         merged_image_base64: merged.split(",")[1],
         filename: "business_card.jpg",
       });
-      // Card submitted — user can close the portal now
-      showSnackbar("Card submitted!", "success",
-        "Lead will be created shortly. You can close this page.", 8000);
+      showToast("Card submitted", "success", 2000);
     } catch (e) {
-      showSnackbar("Upload failed", "error", e.message || String(e), 6000);
+      showToast("Upload failed", "error", 3000);
     }
-
-    // Re-enable after 3s debounce — prevents duplicate submission on double-tap
-    setTimeout(() => {
-      setProcessing(false);
-      _submitLocked = false;
-    }, 3000);
+    setTimeout(() => { btnShutter.disabled = false; _locked = false; }, 3000);
   }
 
-  // ── Snackbar ───────────────────────────────────────────────────────────
-  let snackTimer = null;
-  function showSnackbar(text, type, sub, duration) {
-    const el   = document.getElementById("snackbar");
-    const icon = document.getElementById("sb-icon");
-    const txt  = document.getElementById("sb-text");
-    const subEl= document.getElementById("sb-sub");
-
-    txt.textContent  = text;
-    subEl.textContent = sub || "";
-
-    const icons = { success: "✅", error: "⚠️", warning: "⚡", processing: "⏳" };
-    icon.textContent = icons[type] || "✅";
-
-    el.className = "snackbar show " + (type || "");
-    if (snackTimer) clearTimeout(snackTimer);
-    if (duration !== undefined) {
-      snackTimer = setTimeout(() => el.classList.remove("show"), duration);
-    }
-    // For "processing" type, stay visible until replaced
+  // ── Toast ──────────────────────────────────────────────────────────────
+  let _toastTimer = null;
+  function showToast(text, type, duration) {
+    const el = document.getElementById("toast");
+    document.getElementById("toast-text").textContent = text;
+    el.className = `toast show is-${type || "info"}`;
+    if (_toastTimer) clearTimeout(_toastTimer);
+    if (duration) _toastTimer = setTimeout(() => el.classList.remove("show"), duration);
   }
 
-  // ── Auto-scan toggle ───────────────────────────────────────────────────
-  autoCheck.checked = autoScanOn;
-  autoCheck.addEventListener("change", () => {
-    autoScanOn = autoCheck.checked;
-    localStorage.setItem("nextiq_autoscan", autoScanOn);
-    autoScanOn ? startHeuristic() : stopHeuristic();
+  // ── Button events ──────────────────────────────────────────────────────
+  btnShutter.addEventListener("click", () => { stopHeuristic(); doCapture(); });
+
+  btnRedo.addEventListener("click", () => {
+    frontDataURL = null; stopHeuristic(); goToStep1();
   });
 
-  btnShutter.addEventListener("click", () => { stopHeuristic(); doCapture(); if (autoScanOn) startHeuristic(); });
-  btnRetake.addEventListener("click", () => { frontDataURL = null; stopHeuristic(); goToStep1(); });
-
-  // ── Gallery picker ─────────────────────────────────────────────────────
   const galleryInput = document.getElementById("gallery-input");
-  document.getElementById("btn-gallery").addEventListener("click", () => { galleryInput.value = ""; galleryInput.click(); });
   galleryInput.addEventListener("change", () => {
     const file = galleryInput.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       const dataURL = e.target.result;
       stopHeuristic(); flashCapture();
       if (step === 1) { frontDataURL = dataURL; goToStep2(); }
@@ -678,7 +667,11 @@ html, body {
   });
 
   // ── Init ───────────────────────────────────────────────────────────────
-  startCamera().then(() => goToStep1());
+  startCamera().then(() => {
+    goToStep1();
+    // Position tab slider after DOM paint
+    requestAnimationFrame(() => slideTabTo(tabFront));
+  });
 
 })();
 </script>
