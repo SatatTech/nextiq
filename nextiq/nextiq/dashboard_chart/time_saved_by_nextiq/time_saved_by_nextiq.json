@@ -1,0 +1,23 @@
+{
+ "chart_name": "Time Saved by NextIQ",
+ "chart_type": "Report",
+ "color": "#2ecc71",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart",
+ "dynamic_filters_json": "[]",
+ "filters_json": "{\"period\":\"Daily\"}",
+ "is_public": 1,
+ "is_standard": 1,
+ "module": "NextIQ",
+ "name": "Time Saved by NextIQ",
+ "owner": "Administrator",
+ "report_name": "Time Saved Report",
+ "roles": [],
+ "show_values_over_chart": 1,
+ "time_interval": "Daily",
+ "timeseries": 0,
+ "timespan": "Last Month",
+ "type": "Line",
+ "use_report_chart": 1,
+ "y_axis": []
+}

@@ -27,7 +27,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nQuota Exceeded\nDuplicate Lead",
+   "options": "Pending\nProcessing\nSuccess\nFailed\nInvalid Image\nInvalid Data\nQuota Exceeded\nDuplicate Lead",
    "read_only": 1
   },
   {

@@ -17,7 +17,7 @@
   },
   {
    "fieldname": "api_key",
-   "fieldtype": "Data",
+   "fieldtype": "Password",
    "label": "API Key",
    "reqd": 1,
    "description": "Your API key from NextIQ Service (provided by the NextIQ team)"

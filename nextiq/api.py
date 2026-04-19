@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import base64
+import hashlib
 import hmac
 import ipaddress
 import secrets
@@ -24,6 +25,34 @@ _MAX_FIELD_LEN = 500   # max characters per Lead field value
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 _BLOCKED_HOSTS = frozenset({"metadata.google.internal", "169.254.169.254"})
+
+
+def _get_client_ip():
+	"""
+	Return the best-available client IP.
+
+	Priority:
+	  1. X-Real-IP   — set by nginx/trusted proxy; client cannot forge it.
+	  2. X-Forwarded-For (rightmost valid entry) — added by the nearest trusted
+	     proxy, not the client. The leftmost entry is client-controlled and forgeable.
+	  3. remote_addr — correct when Frappe is directly exposed (no proxy).
+	"""
+	req = frappe.request
+	real_ip = (req.headers.get("X-Real-IP") or "").strip()
+	if real_ip:
+		try:
+			ipaddress.ip_address(real_ip)
+			return real_ip
+		except ValueError:
+			pass
+	forwarded = req.headers.get("X-Forwarded-For") or ""
+	for candidate in reversed([x.strip() for x in forwarded.split(",") if x.strip()]):
+		try:
+			ipaddress.ip_address(candidate)
+			return candidate
+		except ValueError:
+			continue
+	return req.remote_addr or "unknown"
 
 
 def _rate_limit(key, max_per_minute):
@@ -79,8 +108,9 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg"):
 	Returns immediately: {"log_name": str}
 	The browser can close after this — Lead is created via background + callback.
 	"""
-	# Rate limit: 10 scans per minute per user
-	if not _rate_limit(f"nextiq_scan:{frappe.session.user}", max_per_minute=10):
+	# Rate limit: 10 scans per minute per user (hash user to keep plaintext out of Redis)
+	_user_hash = hashlib.sha256(frappe.session.user.encode()).hexdigest()
+	if not _rate_limit(f"nextiq_scan:{_user_hash}", max_per_minute=10):
 		frappe.throw(
 			"Too many scan requests. Please wait a moment and try again.",
 			title="Rate Limited",
@@ -156,8 +186,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 	  - cb_secret is cleared from DB after first successful callback (prevents replay).
 	"""
 	# Rate limit: 60 callbacks per minute per IP — real service sends 1 per scan
-	remote_ip = (frappe.request.headers.get("X-Forwarded-For") or
-				 frappe.request.remote_addr or "unknown").split(",")[0].strip()
+	remote_ip = _get_client_ip()
 	if not _rate_limit(f"nextiq_cb:{remote_ip}", max_per_minute=60):
 		return {"success": False, "error": "rate_limited"}
 
@@ -182,9 +211,12 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 	if current_status not in ("Pending", "Processing"):
 		return {"success": True, "note": "already_processed"}
 
+	# Explicit cast — prevents "false" string being truthy when sent form-encoded
+	success = success if isinstance(success, bool) else str(success).lower() == "true"
+
 	if success:
 		lead_name = None
-		if data:
+		if data and isinstance(data, dict):
 			# Re-validate on this side: only known Lead fields, values truncated to 500 chars.
 			# Defense-in-depth even though the service already filters by ALLOWED_LEAD_FIELDS.
 			data = {
@@ -210,6 +242,31 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				frappe.db.commit()
 				_send_scan_notification(log_name, "duplicate_lead", message=err_msg)
 				return {"success": False, "error": "duplicate_lead"}
+			except frappe.ValidationError as e:
+				# AI processed successfully and returned data, but the data has
+				# values that Frappe cannot accept (e.g. country="USA" instead of
+				# "United States", invalid select option, bad link value, etc.).
+				# Scan is already charged — this is a data quality issue, not a failure.
+				err_msg = str(e)[:500] or "AI data could not be saved as a Lead — one or more field values were invalid."
+				frappe.db.rollback()
+				frappe.db.set_value("Card Scan Log", log_name, {
+					"status": "Invalid Data",
+					"error_message": err_msg,
+					"ai_response": frappe.as_json(data or {}),
+					"processed_at": frappe.utils.now(),
+					"cb_secret": "",
+				})
+				frappe.db.commit()
+				_send_scan_notification(log_name, "invalid_data", message=err_msg)
+				frappe.enqueue(
+					"nextiq.api._send_feedback_to_service",
+					log_name=log_name,
+					feedback_type="Invalid Data",
+					queue="short",
+					timeout=30,
+					now=False,
+				)
+				return {"success": False, "error": "invalid_lead_data"}
 			except Exception as e:
 				frappe.log_error(traceback.format_exc(), f"NextIQ: Lead creation failed for {log_name}")
 				err_msg = str(e)[:500] or "Lead could not be created from scan data."
@@ -222,6 +279,14 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				})
 				frappe.db.commit()
 				_send_scan_notification(log_name, "failed", message=err_msg)
+				frappe.enqueue(
+					"nextiq.api._send_feedback_to_service",
+					log_name=log_name,
+					feedback_type="Failed",
+					queue="short",
+					timeout=30,
+					now=False,
+				)
 				return {"success": False, "error": "lead_creation_failed"}
 
 		success_fields = {
@@ -286,7 +351,7 @@ def _fire_scan_to_service(log_name):
 			raise Exception("NextIQ Settings not configured. Please set Service URL and API Key.")
 
 		service_url = settings.service_url.rstrip("/")
-		api_key     = settings.api_key
+		api_key     = settings.get_password("api_key")
 
 		# ── Validate service_url (SSRF + HTTP warning) ────────────────────────
 		url_err = _validate_service_url(service_url)
@@ -322,11 +387,12 @@ def _fire_scan_to_service(log_name):
 				json={
 					# api_key is sent in the Authorization header, not the body,
 					# so it never appears in Frappe's form_dict or debug logs.
-					"image_base64": image_base64,
-					"filename":     "business_card.jpg",
-					"job_id":       log.job_id,
-					"callback_url": callback_url,
-					"cb_secret":    log.cb_secret,
+					"image_base64":    image_base64,
+					"filename":        log.merged_image.split("/")[-1] if log.merged_image else "business_card.jpg",
+					"job_id":          log.job_id,
+					"callback_url":    callback_url,
+					"cb_secret":       log.cb_secret,
+					"customer_log_id": log.name,
 				},
 				headers={
 					"Content-Type": "application/json",
@@ -386,6 +452,52 @@ def _fire_scan_to_service(log_name):
 		_send_scan_notification(log_name, "failed", message=str(e))
 
 
+# ── Feedback to service ───────────────────────────────────────────────────────
+
+def _send_feedback_to_service(log_name, feedback_type):
+	"""
+	Fire scan feedback to nextiq_service for model training.
+
+	Runs as an enqueued background job — errors are logged, never raised,
+	so they never affect the customer-facing scan flow.
+	"""
+	try:
+		log = frappe.get_doc("Card Scan Log", log_name)
+		settings = frappe.get_single("NextIQ Settings")
+		if not settings.service_url or not settings.api_key:
+			return
+
+		service_url = settings.service_url.rstrip("/")
+		api_key     = settings.get_password("api_key")
+
+		url_err = _validate_service_url(service_url)
+		if url_err:
+			frappe.log_error(f"Feedback skipped — invalid service_url: {url_err}",
+							 f"NextIQ: Feedback Send Failed: {log_name}")
+			return
+
+		requests.post(
+			f"{service_url}/api/method/nextiq_service.api.receive_scan_feedback",
+			json={
+				"job_id":          log.job_id,
+				"feedback_type":   feedback_type,
+				"error_message":   log.error_message or "",
+				"ai_response":     log.ai_response or "",
+				"customer_log_id": log.name,
+			},
+			headers={
+				"Content-Type":    "application/json",
+				"X-NextIQ-API-Key": api_key,
+			},
+			timeout=15,
+		)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"NextIQ: Feedback Send Failed: {log_name}",
+		)
+
+
 # ── Email notification ────────────────────────────────────────────────────────
 
 def _send_scan_notification(log_name, outcome, lead_name=None, message=None, scans_remaining=None):
@@ -438,6 +550,22 @@ def _send_scan_notification(log_name, outcome, lead_name=None, message=None, sca
 				delayed=False,
 			)
 
+		elif outcome == "invalid_data":
+			frappe.sendmail(
+				recipients=[user_email],
+				subject="[NextIQ] Card scan — data could not be saved",
+				message=(
+					"<p>Your card scan completed and the AI extracted data, but one or more "
+					"field values could not be saved as a Lead (e.g. an unrecognised country "
+					"name or invalid option).</p>"
+					"<p><strong>1 scan was used.</strong></p>"
+					+ (f"<p><strong>Details:</strong> {message}</p>" if message else "")
+					+ "<p>Please open the Card Scan Log to review the AI response and "
+					"create the Lead manually.</p>"
+				),
+				delayed=False,
+			)
+
 		elif outcome == "duplicate_lead":
 			frappe.sendmail(
 				recipients=[user_email],
@@ -467,3 +595,57 @@ def _send_scan_notification(log_name, outcome, lead_name=None, message=None, sca
 			frappe.get_traceback(),
 			f"NextIQ: Email notification failed for {log_name}",
 		)
+
+
+# ── Time saved metric ────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_time_saved_minutes():
+	"""Number Card data source: successful leads × 2 minutes per lead."""
+	count = frappe.db.count("Card Scan Log", {"status": "Success"})
+	return (count or 0) * 2
+
+
+# ── Live balance proxy ────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_live_balance():
+	"""
+	Fetch live scan balance from nextiq_service.
+
+	Requires a valid Frappe login session — API key is read server-side from
+	NextIQ Settings and never exposed to the browser.
+
+	Returns the service response dict, or {"success": False, ...} on error.
+	"""
+	settings = frappe.get_single("NextIQ Settings")
+	if not settings.service_url or not settings.api_key:
+		frappe.throw("NextIQ Settings not configured (Service URL or API Key missing).",
+					 title="Not Configured")
+
+	service_url = settings.service_url.rstrip("/")
+	api_key     = settings.get_password("api_key")
+
+	try:
+		resp = requests.get(
+			f"{service_url}/api/method/nextiq_service.api.check_quota",
+			headers={
+				"X-NextIQ-API-Key": api_key,
+				"Content-Type":     "application/json",
+			},
+			timeout=10,
+		)
+	except requests.exceptions.ConnectionError:
+		frappe.throw(f"Cannot reach NextIQ Service at {service_url}.",
+					 title="Connection Error")
+	except requests.exceptions.Timeout:
+		frappe.throw("NextIQ Service did not respond in time.", title="Timeout")
+
+	if resp.status_code == 429:
+		frappe.throw("Balance check rate limit reached. Please wait a moment.",
+					 title="Rate Limited")
+	if resp.status_code >= 400:
+		frappe.throw(f"NextIQ Service returned error {resp.status_code}.",
+					 title="Service Error")
+
+	return resp.json().get("message", {})
