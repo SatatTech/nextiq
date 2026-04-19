@@ -7,281 +7,547 @@
 {% block head_include %}
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
-*, *::before, *::after { box-sizing: border-box; }
-html, body {
-  margin: 0; padding: 0; height: 100%; width: 100%;
-  overflow: hidden; background: #000;
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-.web-footer, footer { display: none !important; }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-/* ── Root ─────────────────────────────────────────────────────────── */
-.scanner-root { position: fixed; inset: 0; z-index: 100; background: #111; }
-#video-main {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%; object-fit: cover;
-}
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
 
-/* ── Flash overlay ────────────────────────────────────────────────── */
-.capture-flash {
-  position: absolute; inset: 0; background: #fff;
-  opacity: 0; pointer-events: none; z-index: 10;
-  transition: opacity .07s;
-}
-.capture-flash.active { opacity: .4; }
+  .web-footer,
+  footer {
+    display: none !important;
+  }
 
-/* ── Header ───────────────────────────────────────────────────────── */
-.header {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
-  padding: calc(env(safe-area-inset-top,0px) + 14px) 18px 0;
-  display: flex; align-items: center; justify-content: space-between;
-}
+  /* ── Root ─────────────────────────────────────────────────────────── */
+  .scanner-root {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #111;
+  }
 
-/* ── Balance pill ─────────────────────────────────────────────────── */
-.balance-pill {
-  height: 36px; padding: 0 12px;
-  border-radius: 50px;
-  background: rgba(0,0,0,.32); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,.08);
-  display: flex; align-items: center; gap: 6px;
-  transition: background .3s, border-color .3s;
-  min-width: 80px;
-}
-.balance-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-  background: rgba(255,255,255,.3);
-  transition: background .3s;
-}
-.balance-text {
-  font-size: 12px; font-weight: 600;
-  color: rgba(255,255,255,.6); white-space: nowrap;
-  transition: color .3s;
-}
-.balance-pill.ok   { border-color: rgba(52,211,153,.25); }
-.balance-pill.ok   .balance-dot  { background: #34d399; }
-.balance-pill.ok   .balance-text { color: #34d399; }
-.balance-pill.warn { border-color: rgba(251,191,36,.25); }
-.balance-pill.warn .balance-dot  { background: #fbbf24; }
-.balance-pill.warn .balance-text { color: #fbbf24; }
-.balance-pill.low  { border-color: rgba(248,113,113,.25); }
-.balance-pill.low  .balance-dot  { background: #f87171; }
-.balance-pill.low  .balance-text { color: #f87171; }
-.btn-flash {
-  height: 36px; padding: 0 12px 0 10px;
-  border-radius: 50px;
-  background: rgba(0,0,0,.32); backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,.08);
-  display: flex; align-items: center; gap: 6px;
-  cursor: pointer;
-  transition: background .2s, border-color .2s;
-}
-.btn-flash svg {
-  width: 16px; height: 16px; fill: none; flex-shrink: 0;
-  stroke: rgba(255,255,255,.65); stroke-width: 1.8;
-  stroke-linecap: round; stroke-linejoin: round;
-  transition: stroke .2s;
-}
-.btn-flash span {
-  font-size: 12px; font-weight: 600;
-  color: rgba(255,255,255,.6); white-space: nowrap;
-  transition: color .2s;
-}
-.btn-flash.on { background: rgba(251,191,36,.18); border-color: rgba(251,191,36,.3); }
-.btn-flash.on svg { stroke: #fbbf24; }
-.btn-flash.on span { color: #fbbf24; }
+  #video-main {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
-/* ── Tab switcher ─────────────────────────────────────────────────── */
-.tab-row {
-  position: absolute;
-  top: calc(env(safe-area-inset-top,0px) + 76px + min(54.2vw, 214px) + 62px);
-  left: 50%; transform: translateX(-50%);
-  z-index: 30;
-  background: rgba(0,0,0,.36);
-  backdrop-filter: blur(16px);
-  border-radius: 50px;
-  padding: 3px;
-  display: flex;
-  border: 1px solid rgba(255,255,255,.1);
-  white-space: nowrap;
-}
-.tab-slider {
-  position: absolute;
-  top: 3px; bottom: 3px;
-  border-radius: 50px;
-  background: #fff;
-  transition: left .32s cubic-bezier(.4,0,.2,1), width .32s cubic-bezier(.4,0,.2,1);
-  pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,.2);
-}
-.tab-pill {
-  padding: 7px 22px;
-  font-size: 12px; font-weight: 600;
-  color: rgba(255,255,255,.5);
-  cursor: pointer; border-radius: 50px;
-  position: relative; z-index: 1;
-  transition: color .28s;
-  user-select: none;
-}
-.tab-pill.active { color: #111; }
+  /* ── Flash overlay ────────────────────────────────────────────────── */
+  .capture-flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    transition: opacity .07s;
+  }
 
-/* ── Scan overlay ─────────────────────────────────────────────────── */
-.scan-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+  .capture-flash.active {
+    opacity: .4;
+  }
 
-/* ── Card frame ───────────────────────────────────────────────────── */
-.card-frame {
-  position: absolute;
-  top: calc(env(safe-area-inset-top,0px) + 76px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(86vw, 340px);
-  aspect-ratio: 1.586;
-  border-radius: 16px;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,.7);
-  overflow: visible;
-}
+  /* ── Header ───────────────────────────────────────────────────────── */
+  .header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 18px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
 
-/* Corner brackets — no full border, just L-shaped corners */
-.corner {
-  position: absolute; width: 26px; height: 26px;
-  border: 2.5px solid rgba(255,255,255,.75);
-  transition: border-color .35s, box-shadow .35s;
-}
-.c-tl { top: -10px; left: -10px;  border-right: 0; border-bottom: 0; border-radius: 16px 0 0 0; }
-.c-tr { top: -10px; right: -10px; border-left: 0;  border-bottom: 0; border-radius: 0 16px 0 0; }
-.c-bl { bottom: -10px; left: -10px;  border-right: 0; border-top: 0; border-radius: 0 0 0 16px; }
-.c-br { bottom: -10px; right: -10px; border-left: 0;  border-top: 0; border-radius: 0 0 16px 0; }
+  /* ── Balance pill ─────────────────────────────────────────────────── */
+  .balance-pill {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 50px;
+    background: rgba(0, 0, 0, .32);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, .08);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .3s, border-color .3s;
+    min-width: 80px;
+  }
 
-.card-frame:not(.steady) .corner { animation: blink 2.4s ease-in-out infinite; }
-@keyframes blink { 0%,100%{opacity:.8} 50%{opacity:.2} }
+  .balance-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .3);
+    transition: background .3s;
+  }
 
-.card-frame.steady .corner {
-  border-color: #818cf8;
-  box-shadow: 0 0 12px rgba(129,140,248,.6);
-  animation: none; opacity: 1;
-}
+  .balance-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .6);
+    white-space: nowrap;
+    transition: color .3s;
+  }
 
-/* ── Scan line (always active, smooth) ────────────────────────────── */
-.scan-line {
-  position: absolute; left: 4%; right: 4%; height: 1.5px;
-  background: linear-gradient(
-    to right,
-    transparent 0%, rgba(255,255,255,0) 8%,
-    rgba(255,255,255,.55) 40%, rgba(255,255,255,.8) 50%,
-    rgba(255,255,255,.55) 60%, rgba(255,255,255,0) 92%,
-    transparent 100%
-  );
-  pointer-events: none; opacity: 0;
-}
-.card-frame.scanning .scan-line {
-  animation: scan-move 2.6s cubic-bezier(.45,.05,.55,.95) infinite;
-}
-@keyframes scan-move {
-  0%   { top: 6%;  opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
-  100% { top: 92%; opacity: 0; }
-}
+  .balance-pill.ok {
+    border-color: rgba(52, 211, 153, .25);
+  }
 
-/* ── Status text below frame ──────────────────────────────────────── */
-.status-text {
-  position: absolute;
-  bottom: -40px; left: -30%; right: -30%;
-  text-align: center;
-  color: rgba(255,255,255,.5);
-  font-size: 12.5px; font-weight: 500; letter-spacing: .05px;
-}
+  .balance-pill.ok .balance-dot {
+    background: #34d399;
+  }
 
-/* ── Bottom bar ───────────────────────────────────────────────────── */
-.bottom-bar {
-  position: absolute;
-  bottom: calc(env(safe-area-inset-bottom,0px) + 32px);
-  left: 32px; right: 32px;
-  display: flex; align-items: center; justify-content: space-between;
-  z-index: 30;
-}
+  .balance-pill.ok .balance-text {
+    color: #34d399;
+  }
 
-/* Left slot: gallery picker or captured front thumbnail */
-.thumb-slot {
-  width: 66px; height: 42px; border-radius: 8px;
-  background: rgba(255,255,255,.08);
-  border: 1.5px solid rgba(255,255,255,.14);
-  overflow: hidden; cursor: pointer; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  transition: transform .1s, opacity .2s;
-}
-.thumb-slot:active { transform: scale(.9); }
-.thumb-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.thumb-slot svg {
-  width: 20px; height: 20px; fill: none;
-  stroke: rgba(255,255,255,.38); stroke-width: 1.6;
-  stroke-linecap: round; stroke-linejoin: round;
-}
+  .balance-pill.warn {
+    border-color: rgba(251, 191, 36, .25);
+  }
 
-/* Center: capture button */
-.shutter-btn {
-  width: 66px; height: 66px; border-radius: 50%;
-  background: #fff; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 5px rgba(255,255,255,.18), 0 4px 22px rgba(0,0,0,.35);
-  transition: transform .1s, background .3s, box-shadow .3s;
-}
-.shutter-btn:active { transform: scale(.87); }
-.shutter-btn:disabled { opacity: .4; pointer-events: none; }
-.shutter-btn.steady {
-  background: #818cf8;
-  box-shadow: 0 0 0 5px rgba(129,140,248,.22), 0 4px 22px rgba(129,140,248,.45);
-}
-.shutter-inner {
-  width: 53px; height: 53px; border-radius: 50%;
-  border: 2px solid rgba(0,0,0,.1);
-}
+  .balance-pill.warn .balance-dot {
+    background: #fbbf24;
+  }
 
-/* Right: redo button */
-.btn-redo {
-  width: 52px; height: 52px; border-radius: 50%;
-  background: rgba(255,255,255,.08);
-  border: 1.5px solid rgba(255,255,255,.14);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; flex-shrink: 0;
-  opacity: 0; pointer-events: none;
-  transition: opacity .25s, transform .1s;
-}
-.btn-redo.visible { opacity: 1; pointer-events: auto; }
-.btn-redo:active { transform: scale(.88); }
-.btn-redo svg {
-  width: 19px; height: 19px; fill: none;
-  stroke: rgba(255,255,255,.65); stroke-width: 1.75;
-  stroke-linecap: round; stroke-linejoin: round;
-}
+  .balance-pill.warn .balance-text {
+    color: #fbbf24;
+  }
 
-/* ── Toast ────────────────────────────────────────────────────────── */
-.toast {
-  position: fixed;
-  top: calc(env(safe-area-inset-top,0px) + 16px);
-  left: 50%;
-  transform: translateX(-50%) translateY(-10px);
-  background: rgba(20,20,28,.92); backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,.08);
-  color: #fff; padding: 8px 16px; border-radius: 50px;
-  font-size: 13px; font-weight: 600;
-  display: flex; align-items: center; gap: 7px;
-  opacity: 0; white-space: nowrap;
-  transition: opacity .2s, transform .25s cubic-bezier(.34,1.3,.64,1);
-  z-index: 9999; pointer-events: none;
-}
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.toast-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-  background: rgba(255,255,255,.3);
-  position: relative; top: 0; align-self: center;
-  display: inline-block;
-}
-.toast.is-success .toast-dot { background: #34d399; }
-.toast.is-error   .toast-dot { background: #f87171; }
-.toast.is-info    .toast-dot { background: #818cf8; }
-.toast-sub { display: none; }
+  .balance-pill.low {
+    border-color: rgba(248, 113, 113, .25);
+  }
+
+  .balance-pill.low .balance-dot {
+    background: #f87171;
+  }
+
+  .balance-pill.low .balance-text {
+    color: #f87171;
+  }
+
+  .btn-flash {
+    height: 36px;
+    padding: 0 12px 0 10px;
+    border-radius: 50px;
+    background: rgba(0, 0, 0, .32);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, .08);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+  }
+
+  .btn-flash svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    flex-shrink: 0;
+    stroke: rgba(255, 255, 255, .65);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke .2s;
+  }
+
+  .btn-flash span {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .6);
+    white-space: nowrap;
+    transition: color .2s;
+  }
+
+  .btn-flash.on {
+    background: rgba(251, 191, 36, .18);
+    border-color: rgba(251, 191, 36, .3);
+  }
+
+  .btn-flash.on svg {
+    stroke: #fbbf24;
+  }
+
+  .btn-flash.on span {
+    color: #fbbf24;
+  }
+
+  /* ── Tab switcher ─────────────────────────────────────────────────── */
+  .tab-row {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 76px + min(54.2vw, 214px) + 62px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    background: rgba(0, 0, 0, .36);
+    backdrop-filter: blur(16px);
+    border-radius: 50px;
+    padding: 3px;
+    display: flex;
+    border: 1px solid rgba(255, 255, 255, .1);
+    white-space: nowrap;
+  }
+
+  .tab-slider {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    border-radius: 50px;
+    background: #fff;
+    transition: left .32s cubic-bezier(.4, 0, .2, 1), width .32s cubic-bezier(.4, 0, .2, 1);
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+  }
+
+  .tab-pill {
+    padding: 7px 22px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .5);
+    cursor: pointer;
+    border-radius: 50px;
+    position: relative;
+    z-index: 1;
+    transition: color .28s;
+    user-select: none;
+  }
+
+  .tab-pill.active {
+    color: #111;
+  }
+
+  /* ── Scan overlay ─────────────────────────────────────────────────── */
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  /* ── Card frame ───────────────────────────────────────────────────── */
+  .card-frame {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 76px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(86vw, 340px);
+    aspect-ratio: 1.586;
+    border-radius: 16px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7);
+    overflow: visible;
+  }
+
+  /* Corner brackets — no full border, just L-shaped corners */
+  .corner {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border: 2.5px solid rgba(255, 255, 255, .75);
+    transition: border-color .35s, box-shadow .35s;
+  }
+
+  .c-tl {
+    top: -10px;
+    left: -10px;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 16px 0 0 0;
+  }
+
+  .c-tr {
+    top: -10px;
+    right: -10px;
+    border-left: 0;
+    border-bottom: 0;
+    border-radius: 0 16px 0 0;
+  }
+
+  .c-bl {
+    bottom: -10px;
+    left: -10px;
+    border-right: 0;
+    border-top: 0;
+    border-radius: 0 0 0 16px;
+  }
+
+  .c-br {
+    bottom: -10px;
+    right: -10px;
+    border-left: 0;
+    border-top: 0;
+    border-radius: 0 0 16px 0;
+  }
+
+  .card-frame:not(.steady) .corner {
+    animation: blink 2.4s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+
+    0%,
+    100% {
+      opacity: .8
+    }
+
+    50% {
+      opacity: .2
+    }
+  }
+
+  .card-frame.steady .corner {
+    border-color: #818cf8;
+    box-shadow: 0 0 12px rgba(129, 140, 248, .6);
+    animation: none;
+    opacity: 1;
+  }
+
+  /* ── Scan line (always active, smooth) ────────────────────────────── */
+  .scan-line {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    height: 1.5px;
+    background: linear-gradient(to right,
+        transparent 0%, rgba(255, 255, 255, 0) 8%,
+        rgba(255, 255, 255, .55) 40%, rgba(255, 255, 255, .8) 50%,
+        rgba(255, 255, 255, .55) 60%, rgba(255, 255, 255, 0) 92%,
+        transparent 100%);
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .card-frame.scanning .scan-line {
+    animation: scan-move 2.6s cubic-bezier(.45, .05, .55, .95) infinite;
+  }
+
+  @keyframes scan-move {
+    0% {
+      top: 6%;
+      opacity: 0;
+    }
+
+    8% {
+      opacity: 1;
+    }
+
+    92% {
+      opacity: 1;
+    }
+
+    100% {
+      top: 92%;
+      opacity: 0;
+    }
+  }
+
+  /* ── Status text below frame ──────────────────────────────────────── */
+  .status-text {
+    position: absolute;
+    bottom: -40px;
+    left: -30%;
+    right: -30%;
+    text-align: center;
+    color: rgba(255, 255, 255, .5);
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: .05px;
+  }
+
+  /* ── Bottom bar ───────────────────────────────────────────────────── */
+  .bottom-bar {
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+    left: 32px;
+    right: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+  }
+
+  /* Left slot: gallery picker or captured front thumbnail */
+  .thumb-slot {
+    width: 66px;
+    height: 42px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .08);
+    border: 1.5px solid rgba(255, 255, 255, .14);
+    overflow: hidden;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .1s, opacity .2s;
+  }
+
+  .thumb-slot:active {
+    transform: scale(.9);
+  }
+
+  .thumb-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-slot svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: rgba(255, 255, 255, .38);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Center: capture button */
+  .shutter-btn {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 5px rgba(255, 255, 255, .18), 0 4px 22px rgba(0, 0, 0, .35);
+    transition: transform .1s, background .3s, box-shadow .3s;
+  }
+
+  .shutter-btn:active {
+    transform: scale(.87);
+  }
+
+  .shutter-btn:disabled {
+    opacity: .4;
+    pointer-events: none;
+  }
+
+  .shutter-btn.steady {
+    background: #818cf8;
+    box-shadow: 0 0 0 5px rgba(129, 140, 248, .22), 0 4px 22px rgba(129, 140, 248, .45);
+  }
+
+  .shutter-inner {
+    width: 53px;
+    height: 53px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, .1);
+  }
+
+  /* Right: redo button */
+  .btn-redo {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .08);
+    border: 1.5px solid rgba(255, 255, 255, .14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s, transform .1s;
+  }
+
+  .btn-redo.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .btn-redo:active {
+    transform: scale(.88);
+  }
+
+  .btn-redo svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: rgba(255, 255, 255, .65);
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ── Toast ────────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: rgba(20, 20, 28, .92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, .08);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity .2s, transform .25s cubic-bezier(.34, 1.3, .64, 1);
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .3);
+    position: relative;
+    top: 0;
+    align-self: center;
+    display: inline-block;
+  }
+
+  .toast.is-success .toast-dot {
+    background: #34d399;
+  }
+
+  .toast.is-error .toast-dot {
+    background: #f87171;
+  }
+
+  .toast.is-info .toast-dot {
+    background: #818cf8;
+  }
+
+  .toast-sub {
+    display: none;
+  }
 </style>
 {% endblock %}
 
@@ -298,7 +564,9 @@ html, body {
       <span class="balance-text" id="balance-text">…</span>
     </div>
     <button class="btn-flash" id="btn-flash" aria-label="Toggle auto scan">
-      <svg viewBox="0 0 24 24"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <svg viewBox="0 0 24 24">
+        <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
       <span>Auto Scan</span>
     </button>
   </div>
@@ -307,7 +575,7 @@ html, body {
   <div class="tab-row" id="tab-row">
     <div class="tab-slider" id="tab-slider"></div>
     <div class="tab-pill active" id="tab-front">Front Side</div>
-    <div class="tab-pill"        id="tab-back">Back Side</div>
+    <div class="tab-pill" id="tab-back">Back Side</div>
   </div>
 
   <!-- Scan overlay: frame + corners + scan line -->
@@ -327,9 +595,9 @@ html, body {
 
     <div class="thumb-slot" id="thumb-slot">
       <svg viewBox="0 0 24 24">
-        <rect x="3" y="3" width="18" height="18" rx="3"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <polyline points="21 15 16 10 5 21"/>
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
       </svg>
     </div>
 
@@ -339,8 +607,8 @@ html, body {
 
     <button class="btn-redo" id="btn-redo" aria-label="Redo front side">
       <svg viewBox="0 0 24 24">
-        <polyline points="1 4 1 10 7 10"/>
-        <path d="M3.51 15a9 9 0 1 0 .49-3.32"/>
+        <polyline points="1 4 1 10 7 10" />
+        <path d="M3.51 15a9 9 0 1 0 .49-3.32" />
       </svg>
     </button>
 
@@ -357,401 +625,397 @@ html, body {
 
 {% block script %}
 <script>
-(function () {
-  "use strict";
+  (function () {
+    "use strict";
 
-  // ── State ─────────────────────────────────────────────────────────────
-  let frontDataURL    = null;
-  let mediaStream     = null;
-  let step            = 1;
-  let scanInterval    = null;
-  let prevSample      = null;
-  let steadyCount     = 0;
-  let scansRemaining  = null;
-  let scansAllowed    = null;
-  // Auto-scan defaults OFF — flash icon is the toggle
-  let autoScanOn   = localStorage.getItem("nextiq_autoscan") === "true";
+    // ── State ─────────────────────────────────────────────────────────────
+    let frontDataURL = null;
+    let mediaStream = null;
+    let step = 1;
+    let scanInterval = null;
+    let prevSample = null;
+    let steadyCount = 0;
+    let scansRemaining = null;
+    let scansAllowed = null;
+    // Auto-scan defaults OFF — flash icon is the toggle
+    let autoScanOn = localStorage.getItem("nextiq_autoscan") === "true";
 
-  const SAMPLE_MS     = 200;
-  const STEADY_NEEDED = 10;
-  const STABLE_THRESH = 8;
+    const SAMPLE_MS = 200;
+    const STEADY_NEEDED = 10;
+    const STABLE_THRESH = 8;
 
-  // ── DOM ───────────────────────────────────────────────────────────────
-  const video      = document.getElementById("video-main");
-  const cardFrame  = document.getElementById("card-frame");
-  const statusText = document.getElementById("status-text");
-  const tabFront   = document.getElementById("tab-front");
-  const tabBack    = document.getElementById("tab-back");
-  const tabSlider  = document.getElementById("tab-slider");
-  const thumbSlot  = document.getElementById("thumb-slot");
-  const btnShutter = document.getElementById("btn-shutter");
-  const btnRedo    = document.getElementById("btn-redo");
-  const btnFlash = document.getElementById("btn-flash");
-  const flashEl  = document.getElementById("capture-flash");
+    // ── DOM ───────────────────────────────────────────────────────────────
+    const video = document.getElementById("video-main");
+    const cardFrame = document.getElementById("card-frame");
+    const statusText = document.getElementById("status-text");
+    const tabFront = document.getElementById("tab-front");
+    const tabBack = document.getElementById("tab-back");
+    const tabSlider = document.getElementById("tab-slider");
+    const thumbSlot = document.getElementById("thumb-slot");
+    const btnShutter = document.getElementById("btn-shutter");
+    const btnRedo = document.getElementById("btn-redo");
+    const btnFlash = document.getElementById("btn-flash");
+    const flashEl = document.getElementById("capture-flash");
 
-  // ── Tab slider ────────────────────────────────────────────────────────
-  function slideTabTo(pill) {
-    const rowRect  = document.getElementById("tab-row").getBoundingClientRect();
-    const pillRect = pill.getBoundingClientRect();
-    tabSlider.style.left  = (pillRect.left - rowRect.left) + "px";
-    tabSlider.style.width = pillRect.width + "px";
-  }
-
-  function setActiveTab(which) {
-    tabFront.classList.toggle("active", which === "front");
-    tabBack.classList.toggle("active",  which === "back");
-    slideTabTo(which === "front" ? tabFront : tabBack);
-  }
-
-  // ── Camera ────────────────────────────────────────────────────────────
-  async function startCamera() {
-    stopCamera();
-    const tries = [
-      { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
-      { video: { facingMode: "environment" } },
-      { video: true },
-    ];
-    for (const c of tries) {
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia(c);
-        video.srcObject = mediaStream;
-        await video.play();
-        return;
-      } catch (_) {}
+    // ── Tab slider ────────────────────────────────────────────────────────
+    function slideTabTo(pill) {
+      const rowRect = document.getElementById("tab-row").getBoundingClientRect();
+      const pillRect = pill.getBoundingClientRect();
+      tabSlider.style.left = (pillRect.left - rowRect.left) + "px";
+      tabSlider.style.width = pillRect.width + "px";
     }
-    showToast("Camera unavailable", "error", 0);
-  }
 
-  function stopCamera() {
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-  }
-
-  // ── Auto-scan toggle (flash icon) ─────────────────────────────────────
-  btnFlash.classList.toggle("on", autoScanOn);
-  btnFlash.addEventListener("click", () => {
-    autoScanOn = !autoScanOn;
-    localStorage.setItem("nextiq_autoscan", String(autoScanOn));
-    btnFlash.classList.toggle("on", autoScanOn);
-    autoScanOn ? startHeuristic() : stopHeuristic();
-  });
-
-  // ── Crop to card frame ────────────────────────────────────────────────
-  function screenRectToVideo(rect) {
-    const vw    = video.videoWidth  || 1280;
-    const vh    = video.videoHeight || 720;
-    const scale = Math.max(window.innerWidth / vw, window.innerHeight / vh);
-    const ox    = (vw * scale - window.innerWidth)  / 2;
-    const oy    = (vh * scale - window.innerHeight) / 2;
-    return {
-      x: (rect.left + ox) / scale,
-      y: (rect.top  + oy) / scale,
-      w: rect.width  / scale,
-      h: rect.height / scale,
-    };
-  }
-
-  function cropToCardFrame() {
-    const rect = cardFrame.getBoundingClientRect();
-    const vr   = screenRectToVideo(rect);
-    const x = Math.max(0, Math.round(vr.x));
-    const y = Math.max(0, Math.round(vr.y));
-    const w = Math.min(Math.round(vr.w), video.videoWidth  - x);
-    const h = Math.min(Math.round(vr.h), video.videoHeight - y);
-    const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    cv.getContext("2d").drawImage(video, x, y, w, h, 0, 0, w, h);
-    return cv.toDataURL("image/jpeg", 0.92);
-  }
-
-  // ── Steady-frame detection ────────────────────────────────────────────
-  const sampleCv  = document.createElement("canvas");
-  sampleCv.width  = 120; sampleCv.height = 75;
-  const sampleCtx = sampleCv.getContext("2d");
-
-  function getSampleData() {
-    const rect = cardFrame.getBoundingClientRect();
-    const vr   = screenRectToVideo(rect);
-    const pad  = 0.05;
-    sampleCtx.drawImage(
-      video,
-      vr.x + vr.w*pad, vr.y + vr.h*pad,
-      vr.w*(1-2*pad),  vr.h*(1-2*pad),
-      0, 0, 120, 75
-    );
-    return sampleCtx.getImageData(0, 0, 120, 75);
-  }
-
-  function analyseFrame(imgData) {
-    const d = imgData.data, w = imgData.width, h = imgData.height;
-    const g = new Uint8Array(w * h);
-    let sumR = 0, sumG = 0, sumB = 0;
-    for (let i = 0; i < g.length; i++) {
-      const p = i * 4;
-      g[i] = (d[p]*0.299 + d[p+1]*0.587 + d[p+2]*0.114) | 0;
-      sumR += d[p]; sumG += d[p+1]; sumB += d[p+2];
+    function setActiveTab(which) {
+      tabFront.classList.toggle("active", which === "front");
+      tabBack.classList.toggle("active", which === "back");
+      slideTabTo(which === "front" ? tabFront : tabBack);
     }
-    const ET = 28; let edgeCount = 0;
-    for (let y = 1; y < h-1; y++) {
-      for (let x = 1; x < w-1; x++) {
-        const tl=g[(y-1)*w+(x-1)], tc=g[(y-1)*w+x],   tr=g[(y-1)*w+(x+1)];
-        const ml=g[y    *w+(x-1)],                      mr=g[y    *w+(x+1)];
-        const bl=g[(y+1)*w+(x-1)], bc=g[(y+1)*w+x],   br=g[(y+1)*w+(x+1)];
-        const gx = -tl-2*ml-bl+tr+2*mr+br;
-        const gy = -tl-2*tc-tr+bl+2*bc+br;
-        if (gx*gx + gy*gy > ET*ET) edgeCount++;
-      }
-    }
-    const n = g.length;
-    return { edgeDensity: edgeCount/((w-2)*(h-2)), avgR: sumR/n, avgG: sumG/n, avgB: sumB/n };
-  }
 
-  function isStable(a, b) {
-    return (Math.abs(a.avgR-b.avgR) + Math.abs(a.avgG-b.avgG) + Math.abs(a.avgB-b.avgB)) / 3 < STABLE_THRESH;
-  }
-
-  function resetSteady() {
-    steadyCount = 0; prevSample = null;
-    cardFrame.classList.remove("steady");
-    btnShutter.classList.remove("steady");
-  }
-
-  function startHeuristic() {
-    if (scanInterval) return;
-    resetSteady();
-    cardFrame.classList.add("scanning");
-    scanInterval = setInterval(() => {
-      if (!video.videoWidth) return;
-      try {
-        const cur = analyseFrame(getSampleData());
-        if (cur.edgeDensity < 0.05) {
-          resetSteady(); prevSample = null;
-          statusText.textContent = step === 1 ? "Align front of business card" : "Flip — align back side";
+    // ── Camera ────────────────────────────────────────────────────────────
+    async function startCamera() {
+      stopCamera();
+      const tries = [
+        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+        { video: { facingMode: "environment" } },
+        { video: true },
+      ];
+      for (const c of tries) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(c);
+          video.srcObject = mediaStream;
+          await video.play();
           return;
+        } catch (_) { }
+      }
+      showToast("Camera unavailable", "error", 0);
+    }
+
+    function stopCamera() {
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    }
+
+    // ── Auto-scan toggle (flash icon) ─────────────────────────────────────
+    btnFlash.classList.toggle("on", autoScanOn);
+    btnFlash.addEventListener("click", () => {
+      autoScanOn = !autoScanOn;
+      localStorage.setItem("nextiq_autoscan", String(autoScanOn));
+      btnFlash.classList.toggle("on", autoScanOn);
+      autoScanOn ? startHeuristic() : stopHeuristic();
+    });
+
+    // ── Crop to card frame ────────────────────────────────────────────────
+    function screenRectToVideo(rect) {
+      const vw = video.videoWidth || 1280;
+      const vh = video.videoHeight || 720;
+      const scale = Math.max(window.innerWidth / vw, window.innerHeight / vh);
+      const ox = (vw * scale - window.innerWidth) / 2;
+      const oy = (vh * scale - window.innerHeight) / 2;
+      return {
+        x: (rect.left + ox) / scale,
+        y: (rect.top + oy) / scale,
+        w: rect.width / scale,
+        h: rect.height / scale,
+      };
+    }
+
+    function cropToCardFrame() {
+      const rect = cardFrame.getBoundingClientRect();
+      const vr = screenRectToVideo(rect);
+      const x = Math.max(0, Math.round(vr.x));
+      const y = Math.max(0, Math.round(vr.y));
+      const w = Math.min(Math.round(vr.w), video.videoWidth - x);
+      const h = Math.min(Math.round(vr.h), video.videoHeight - y);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(video, x, y, w, h, 0, 0, w, h);
+      return cv.toDataURL("image/jpeg", 0.92);
+    }
+
+    // ── Steady-frame detection ────────────────────────────────────────────
+    const sampleCv = document.createElement("canvas");
+    sampleCv.width = 120; sampleCv.height = 75;
+    const sampleCtx = sampleCv.getContext("2d");
+
+    function getSampleData() {
+      const rect = cardFrame.getBoundingClientRect();
+      const vr = screenRectToVideo(rect);
+      const pad = 0.05;
+      sampleCtx.drawImage(
+        video,
+        vr.x + vr.w * pad, vr.y + vr.h * pad,
+        vr.w * (1 - 2 * pad), vr.h * (1 - 2 * pad),
+        0, 0, 120, 75
+      );
+      return sampleCtx.getImageData(0, 0, 120, 75);
+    }
+
+    function analyseFrame(imgData) {
+      const d = imgData.data, w = imgData.width, h = imgData.height;
+      const g = new Uint8Array(w * h);
+      let sumR = 0, sumG = 0, sumB = 0;
+      for (let i = 0; i < g.length; i++) {
+        const p = i * 4;
+        g[i] = (d[p] * 0.299 + d[p + 1] * 0.587 + d[p + 2] * 0.114) | 0;
+        sumR += d[p]; sumG += d[p + 1]; sumB += d[p + 2];
+      }
+      const ET = 28; let edgeCount = 0;
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const tl = g[(y - 1) * w + (x - 1)], tc = g[(y - 1) * w + x], tr = g[(y - 1) * w + (x + 1)];
+          const ml = g[y * w + (x - 1)], mr = g[y * w + (x + 1)];
+          const bl = g[(y + 1) * w + (x - 1)], bc = g[(y + 1) * w + x], br = g[(y + 1) * w + (x + 1)];
+          const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+          const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+          if (gx * gx + gy * gy > ET * ET) edgeCount++;
         }
-        if (prevSample && isStable(cur, prevSample)) {
-          steadyCount++;
-          if (steadyCount >= 2) {
-            cardFrame.classList.add("steady");
-            btnShutter.classList.add("steady");
+      }
+      const n = g.length;
+      return { edgeDensity: edgeCount / ((w - 2) * (h - 2)), avgR: sumR / n, avgG: sumG / n, avgB: sumB / n };
+    }
+
+    function isStable(a, b) {
+      return (Math.abs(a.avgR - b.avgR) + Math.abs(a.avgG - b.avgG) + Math.abs(a.avgB - b.avgB)) / 3 < STABLE_THRESH;
+    }
+
+    function resetSteady() {
+      steadyCount = 0; prevSample = null;
+      cardFrame.classList.remove("steady");
+      btnShutter.classList.remove("steady");
+    }
+
+    function startHeuristic() {
+      if (scanInterval) return;
+      resetSteady();
+      cardFrame.classList.add("scanning");
+      scanInterval = setInterval(() => {
+        if (!video.videoWidth) return;
+        try {
+          const cur = analyseFrame(getSampleData());
+          if (cur.edgeDensity < 0.05) {
+            resetSteady(); prevSample = null;
+            statusText.textContent = step === 1 ? "Align front of business card" : "Flip — align back side";
+            return;
+          }
+          if (prevSample && isStable(cur, prevSample)) {
+            steadyCount++;
+            if (steadyCount >= 2) {
+              cardFrame.classList.add("steady");
+              btnShutter.classList.add("steady");
+              statusText.textContent = "Hold steady…";
+            }
+            if (steadyCount >= STEADY_NEEDED) { stopHeuristic(); doCapture(); }
+          } else {
+            steadyCount = 0;
             statusText.textContent = "Hold steady…";
           }
-          if (steadyCount >= STEADY_NEEDED) { stopHeuristic(); doCapture(); }
-        } else {
-          steadyCount = 0;
-          statusText.textContent = "Hold steady…";
-        }
-        prevSample = cur;
-      } catch (_) {}
-    }, SAMPLE_MS);
-  }
-
-  function stopHeuristic() {
-    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-    cardFrame.classList.remove("scanning");
-    resetSteady();
-  }
-
-  // ── Flash ──────────────────────────────────────────────────────────────
-  function flashCapture() {
-    flashEl.classList.add("active");
-    setTimeout(() => flashEl.classList.remove("active"), 90);
-  }
-
-  // ── Capture ────────────────────────────────────────────────────────────
-  function doCapture() {
-    flashCapture();
-    if (step === 1) {
-      frontDataURL = cropToCardFrame();
-      goToStep2();
-    } else {
-      const backURL = cropToCardFrame();
-      submitInBackground(frontDataURL, backURL);
-      frontDataURL = null;
-      goToStep1();
+          prevSample = cur;
+        } catch (_) { }
+      }, SAMPLE_MS);
     }
-  }
 
-  // ── Step transitions ───────────────────────────────────────────────────
-  function goToStep1() {
-    step = 1;
-    statusText.textContent = "Align front of business card";
-    setActiveTab("front");
-    // Reset thumb slot back to gallery icon
-    thumbSlot.innerHTML = `<svg viewBox="0 0 24 24">
+    function stopHeuristic() {
+      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+      cardFrame.classList.remove("scanning");
+      resetSteady();
+    }
+
+    // ── Flash ──────────────────────────────────────────────────────────────
+    function flashCapture() {
+      flashEl.classList.add("active");
+      setTimeout(() => flashEl.classList.remove("active"), 90);
+    }
+
+    // ── Capture ────────────────────────────────────────────────────────────
+    function doCapture() {
+      flashCapture();
+      if (step === 1) {
+        frontDataURL = cropToCardFrame();
+        goToStep2();
+      } else {
+        const backURL = cropToCardFrame();
+        submitInBackground(frontDataURL, backURL);
+        frontDataURL = null;
+        goToStep1();
+      }
+    }
+
+    // ── Step transitions ───────────────────────────────────────────────────
+    function goToStep1() {
+      step = 1;
+      statusText.textContent = "Align front of business card";
+      setActiveTab("front");
+      // Reset thumb slot back to gallery icon
+      thumbSlot.innerHTML = `<svg viewBox="0 0 24 24">
       <rect x="3" y="3" width="18" height="18" rx="3"/>
       <circle cx="8.5" cy="8.5" r="1.5"/>
       <polyline points="21 15 16 10 5 21"/>
     </svg>`;
-    thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
-    btnRedo.classList.remove("visible");
-    autoScanOn ? startHeuristic() : resetSteady();
-  }
+      thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
+      btnRedo.classList.remove("visible");
+      autoScanOn ? startHeuristic() : resetSteady();
+    }
 
-  function goToStep2() {
-    step = 2;
-    statusText.textContent = "Flip — align back side";
-    setActiveTab("back");
-    // Show captured front image in thumb slot
-    const img = new Image();
-    img.src = frontDataURL;
-    thumbSlot.innerHTML = "";
-    thumbSlot.appendChild(img);
-    thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
-    btnRedo.classList.add("visible");
-    autoScanOn ? startHeuristic() : resetSteady();
-  }
-
-  // ── Image compression + merge ──────────────────────────────────────────
-  const MAX_PX    = 900;
-  const MAX_BYTES = 900_000;
-  const QUALITIES = [0.82, 0.72, 0.62];
-
-  function loadScaled(dataURL, maxPx) {
-    return new Promise((resolve, reject) => {
+    function goToStep2() {
+      step = 2;
+      statusText.textContent = "Flip — align back side";
+      setActiveTab("back");
+      // Show captured front image in thumb slot
       const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let w = img.naturalWidth, h = img.naturalHeight;
-        if (w > maxPx || h > maxPx) { const r = Math.min(maxPx/w, maxPx/h); w=Math.round(w*r); h=Math.round(h*r); }
-        resolve({ img, w, h });
-      };
-      img.src = dataURL;
-    });
-  }
-
-  function b64Bytes(d) {
-    const b = (d.split(",")[1] || "");
-    return Math.floor(b.length * 3/4) - (b.match(/=+$/) || [""])[0].length;
-  }
-
-  async function mergeImages(frontURL, backURL) {
-    const [f, b] = await Promise.all([loadScaled(frontURL, MAX_PX), loadScaled(backURL, MAX_PX)]);
-    const GAP=20, PAD=10, LH=26;
-    const cv  = document.createElement("canvas");
-    cv.width  = f.w + GAP + b.w + PAD*2;
-    cv.height = Math.max(f.h, b.h) + PAD*2 + LH;
-    const ctx = cv.getContext("2d");
-    ctx.fillStyle = "#f8f9fa"; ctx.fillRect(0,0,cv.width,cv.height);
-    ctx.fillStyle = "#555"; ctx.font = "bold 18px Arial,sans-serif";
-    ctx.fillText("FRONT", PAD, LH-6);
-    ctx.fillText("BACK",  PAD+f.w+GAP, LH-6);
-    ctx.drawImage(f.img, 0,0,f.img.naturalWidth,f.img.naturalHeight, PAD,          LH+PAD, f.w, f.h);
-    ctx.drawImage(b.img, 0,0,b.img.naturalWidth,b.img.naturalHeight, PAD+f.w+GAP,  LH+PAD, b.w, b.h);
-    let result;
-    for (const q of QUALITIES) {
-      result = cv.toDataURL("image/jpeg", q);
-      if (b64Bytes(result) <= MAX_BYTES) break;
+      img.src = frontDataURL;
+      thumbSlot.innerHTML = "";
+      thumbSlot.appendChild(img);
+      thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
+      btnRedo.classList.add("visible");
+      autoScanOn ? startHeuristic() : resetSteady();
     }
-    if (b64Bytes(result) > MAX_BYTES) {
-      const cv2 = document.createElement("canvas");
-      cv2.width  = Math.round(cv.width/2); cv2.height = Math.round(cv.height/2);
-      cv2.getContext("2d").drawImage(cv, 0, 0, cv2.width, cv2.height);
-      result = cv2.toDataURL("image/jpeg", 0.62);
-    }
-    return result;
-  }
 
-  // ── API helper (portal-safe: explicit CSRF token) ──────────────────────
-  function apiCall(method, args) {
-    const token = (frappe && frappe.csrf_token) ? frappe.csrf_token : "Fetch";
-    return fetch("/api/method/" + method, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Frappe-CSRF-Token": token,
-      },
-      body: JSON.stringify(args || {}),
-    }).then(r => {
-      if (!r.ok) return r.json().then(d => Promise.reject(d));
-      return r.json();
-    }).then(d => d.message);
-  }
+    // ── Image compression + merge ──────────────────────────────────────────
+    const MAX_PX = 900;
+    const MAX_BYTES = 900_000;
+    const QUALITIES = [0.82, 0.72, 0.62];
 
-  // ── Balance ────────────────────────────────────────────────────────────
-  const balancePill = document.getElementById("balance-pill");
-  const balanceText = document.getElementById("balance-text");
-
-  function renderBalance() {
-    if (scansRemaining === null) { balanceText.textContent = "…"; balancePill.className = "balance-pill"; return; }
-    balanceText.textContent = scansRemaining + " left";
-    const pct = scansAllowed > 0 ? scansRemaining / scansAllowed : 0;
-    balancePill.className = "balance-pill " + (pct <= 0 || scansRemaining === 0 ? "low" : pct < 0.2 ? "warn" : "ok");
-  }
-
-  function fetchBalance() {
-    apiCall("nextiq.api.get_live_balance").then(d => {
-      if (d && d.success) {
-        scansRemaining = d.scans_remaining;
-        scansAllowed   = d.scans_allowed;
-        renderBalance();
-      }
-    }).catch(() => {});
-  }
-
-  // ── Submit ─────────────────────────────────────────────────────────────
-  let _locked = false;
-
-  async function submitInBackground(frontURL, backURL) {
-    if (_locked) return;
-    _locked = true;
-    btnShutter.disabled = true;
-    showToast("Uploading…", "info", 8000);
-    try {
-      const merged = await mergeImages(frontURL, backURL);
-      await apiCall("nextiq.api.submit_card_scan", {
-        merged_image_base64: merged.split(",")[1],
-        filename: "business_card.jpg",
+    function loadScaled(dataURL, maxPx) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > maxPx || h > maxPx) { const r = Math.min(maxPx / w, maxPx / h); w = Math.round(w * r); h = Math.round(h * r); }
+          resolve({ img, w, h });
+        };
+        img.src = dataURL;
       });
-      showToast("Card submitted", "success", 2000);
-      // Optimistically decrement; re-fetch to get accurate server value
-      if (scansRemaining !== null) { scansRemaining = Math.max(0, scansRemaining - 1); renderBalance(); }
-      setTimeout(fetchBalance, 4000);
-    } catch (e) {
-      showToast("Upload failed", "error", 3000);
     }
-    setTimeout(() => { btnShutter.disabled = false; _locked = false; }, 3000);
-  }
 
-  // ── Toast ──────────────────────────────────────────────────────────────
-  let _toastTimer = null;
-  function showToast(text, type, duration) {
-    const el = document.getElementById("toast");
-    document.getElementById("toast-text").textContent = text;
-    el.className = `toast show is-${type || "info"}`;
-    if (_toastTimer) clearTimeout(_toastTimer);
-    if (duration) _toastTimer = setTimeout(() => el.classList.remove("show"), duration);
-  }
+    function b64Bytes(d) {
+      const b = (d.split(",")[1] || "");
+      return Math.floor(b.length * 3 / 4) - (b.match(/=+$/) || [""])[0].length;
+    }
 
-  // ── Button events ──────────────────────────────────────────────────────
-  btnShutter.addEventListener("click", () => { stopHeuristic(); doCapture(); });
+    async function mergeImages(frontURL, backURL) {
+      const [f, b] = await Promise.all([loadScaled(frontURL, MAX_PX), loadScaled(backURL, MAX_PX)]);
+      const GAP = 20, PAD = 10, LH = 26;
+      const cv = document.createElement("canvas");
+      cv.width = f.w + GAP + b.w + PAD * 2;
+      cv.height = Math.max(f.h, b.h) + PAD * 2 + LH;
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#f8f9fa"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#555"; ctx.font = "bold 18px Arial,sans-serif";
+      ctx.fillText("FRONT", PAD, LH - 6);
+      ctx.fillText("BACK", PAD + f.w + GAP, LH - 6);
+      ctx.drawImage(f.img, 0, 0, f.img.naturalWidth, f.img.naturalHeight, PAD, LH + PAD, f.w, f.h);
+      ctx.drawImage(b.img, 0, 0, b.img.naturalWidth, b.img.naturalHeight, PAD + f.w + GAP, LH + PAD, b.w, b.h);
+      let result;
+      for (const q of QUALITIES) {
+        result = cv.toDataURL("image/jpeg", q);
+        if (b64Bytes(result) <= MAX_BYTES) break;
+      }
+      if (b64Bytes(result) > MAX_BYTES) {
+        const cv2 = document.createElement("canvas");
+        cv2.width = Math.round(cv.width / 2); cv2.height = Math.round(cv.height / 2);
+        cv2.getContext("2d").drawImage(cv, 0, 0, cv2.width, cv2.height);
+        result = cv2.toDataURL("image/jpeg", 0.62);
+      }
+      return result;
+    }
 
-  btnRedo.addEventListener("click", () => {
-    frontDataURL = null; stopHeuristic(); goToStep1();
-  });
+    // ── API helper (portal-safe: uses frappe.call which handles CSRF) ────────
+    function apiCall(method, args) {
+      return new Promise((resolve, reject) => {
+        frappe.call({
+          method: method,
+          args: args || {},
+          freeze: false,
+          callback: r => resolve(r.message),
+          error: r => reject(r),
+        });
+      });
+    }
 
-  const galleryInput = document.getElementById("gallery-input");
-  galleryInput.addEventListener("change", () => {
-    const file = galleryInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const dataURL = e.target.result;
-      stopHeuristic(); flashCapture();
-      if (step === 1) { frontDataURL = dataURL; goToStep2(); }
-      else { submitInBackground(frontDataURL, dataURL); frontDataURL = null; goToStep1(); }
-    };
-    reader.readAsDataURL(file);
-  });
+    // ── Balance ────────────────────────────────────────────────────────────
+    const balancePill = document.getElementById("balance-pill");
+    const balanceText = document.getElementById("balance-text");
 
-  // ── Init ───────────────────────────────────────────────────────────────
-  fetchBalance();
-  startCamera().then(() => {
-    goToStep1();
-    // Position tab slider after DOM paint
-    requestAnimationFrame(() => slideTabTo(tabFront));
-  });
+    function renderBalance() {
+      if (scansRemaining === null) { balanceText.textContent = "…"; balancePill.className = "balance-pill"; return; }
+      balanceText.textContent = scansRemaining + " left";
+      const pct = scansAllowed > 0 ? scansRemaining / scansAllowed : 0;
+      balancePill.className = "balance-pill " + (pct <= 0 || scansRemaining === 0 ? "low" : pct < 0.2 ? "warn" : "ok");
+    }
 
-})();
+    function fetchBalance() {
+      apiCall("nextiq.api.get_live_balance").then(d => {
+        if (d && d.success) {
+          scansRemaining = d.scans_remaining;
+          scansAllowed = d.scans_allowed;
+          renderBalance();
+        }
+      }).catch(() => { });
+    }
+
+    // ── Submit ─────────────────────────────────────────────────────────────
+    let _locked = false;
+
+    async function submitInBackground(frontURL, backURL) {
+      if (_locked) return;
+      _locked = true;
+      btnShutter.disabled = true;
+      showToast("Uploading…", "info", 8000);
+      try {
+        const merged = await mergeImages(frontURL, backURL);
+        await apiCall("nextiq.api.submit_card_scan", {
+          merged_image_base64: merged.split(",")[1],
+          filename: "business_card.jpg",
+        });
+        showToast("Card submitted", "success", 2000);
+        // Optimistically decrement; re-fetch to get accurate server value
+        if (scansRemaining !== null) { scansRemaining = Math.max(0, scansRemaining - 1); renderBalance(); }
+        setTimeout(fetchBalance, 4000);
+      } catch (e) {
+        showToast("Upload failed", "error", 3000);
+      }
+      setTimeout(() => { btnShutter.disabled = false; _locked = false; }, 3000);
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    let _toastTimer = null;
+    function showToast(text, type, duration) {
+      const el = document.getElementById("toast");
+      document.getElementById("toast-text").textContent = text;
+      el.className = `toast show is-${type || "info"}`;
+      if (_toastTimer) clearTimeout(_toastTimer);
+      if (duration) _toastTimer = setTimeout(() => el.classList.remove("show"), duration);
+    }
+
+    // ── Button events ──────────────────────────────────────────────────────
+    btnShutter.addEventListener("click", () => { stopHeuristic(); doCapture(); });
+
+    btnRedo.addEventListener("click", () => {
+      frontDataURL = null; stopHeuristic(); goToStep1();
+    });
+
+    const galleryInput = document.getElementById("gallery-input");
+    galleryInput.addEventListener("change", () => {
+      const file = galleryInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataURL = e.target.result;
+        stopHeuristic(); flashCapture();
+        if (step === 1) { frontDataURL = dataURL; goToStep2(); }
+        else { submitInBackground(frontDataURL, dataURL); frontDataURL = null; goToStep1(); }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    fetchBalance();
+    startCamera().then(() => {
+      goToStep1();
+      // Position tab slider after DOM paint
+      requestAnimationFrame(() => slideTabTo(tabFront));
+    });
+
+  })();
 </script>
 {% endblock %}

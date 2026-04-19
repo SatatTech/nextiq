@@ -17,6 +17,7 @@
  "report_type": "Script Report",
  "roles": [
   { "role": "System Manager" },
-  { "role": "All" }
+  { "role": "Sales User" },
+  { "role": "Sales Manager" }
  ]
 }

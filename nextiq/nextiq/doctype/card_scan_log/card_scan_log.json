@@ -125,21 +125,25 @@
    "delete": 1,
    "export": 1,
    "read": 1,
+   "report": 1,
    "role": "Administrator",
    "write": 1
   },
   {
    "export": 1,
    "read": 1,
+   "report": 1,
    "role": "System Manager",
    "write": 1
   },
   {
    "read": 1,
+   "report": 1,
    "role": "Sales User"
   },
   {
    "read": 1,
+   "report": 1,
    "role": "Sales Manager"
   }
  ],
