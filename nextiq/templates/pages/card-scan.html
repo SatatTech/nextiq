@@ -628,6 +628,7 @@
   (function () {
     "use strict";
 
+
     // ── State ─────────────────────────────────────────────────────────────
     let frontDataURL = null;
     let mediaStream = null;
@@ -1009,7 +1010,9 @@
     });
 
     // ── Init ───────────────────────────────────────────────────────────────
-    fetchBalance();
+    // Frappe injects frappe.csrf_token AFTER our script block in the HTML,
+    // so defer the first API call to after the full page has parsed.
+    setTimeout(fetchBalance, 0);
     startCamera().then(() => {
       goToStep1();
       // Position tab slider after DOM paint
