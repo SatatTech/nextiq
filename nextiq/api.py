@@ -23,6 +23,10 @@ _ALLOWED_LEAD_FIELDS = frozenset({
 _MAX_FIELD_LEN = 500   # max characters per Lead field value
 
 
+class _QuotaExceededError(Exception):
+    pass
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -382,6 +386,8 @@ def _fire_scan_to_service(log_name):
 			raise Exception("NextIQ Service returned a bad gateway error (502). Please try again.")
 		elif response.status_code >= 500:
 			raise Exception(f"NextIQ Service returned a server error ({response.status_code}).")
+		elif response.status_code == 402:
+			raise _QuotaExceededError("Scan quota exhausted. Please contact the NextIQ team to top up.")
 		elif response.status_code in (401, 403):
 			raise Exception(
 				f"NextIQ Service rejected the request ({response.status_code}). "
@@ -405,6 +411,15 @@ def _fire_scan_to_service(log_name):
 		)
 		# RQ job ends here in <1s. Lead creation happens in scan_callback.
 
+	except _QuotaExceededError as e:
+		logger.warning(f"[NextIQ] Quota exceeded for scan {log_name}: {e}")
+		frappe.db.set_value("Card Scan Log", log_name, {
+			"status": "Quota Exceeded",
+			"error_message": str(e)[:1000],
+			"processed_at": frappe.utils.now(),
+		})
+		frappe.db.commit()
+		_send_scan_notification(log_name, "quota_exceeded", message=str(e))
 	except Exception as e:
 		logger.error(f"[NextIQ] Failed to fire scan {log_name}: {e}\n{traceback.format_exc()}")
 		frappe.log_error(traceback.format_exc(), f"NextIQ: Fire Scan Failed: {log_name}")
