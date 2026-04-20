@@ -1033,6 +1033,10 @@
 
     async function submitInBackground(frontURL, backURL) {
       if (_locked) return;
+      if (scansRemaining !== null && scansRemaining <= 0) {
+        showToast("No scans remaining — please top up your quota", "error", 4000);
+        return;
+      }
       _locked = true;
       btnShutter.disabled = true;
       showToast("Uploading…", "info", 8000);
