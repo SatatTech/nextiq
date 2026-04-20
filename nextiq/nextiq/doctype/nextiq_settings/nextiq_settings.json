@@ -4,17 +4,9 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "service_url",
   "api_key"
  ],
  "fields": [
-  {
-   "fieldname": "service_url",
-   "fieldtype": "Data",
-   "label": "NextIQ Service URL",
-   "reqd": 1,
-   "description": "URL of your NextIQ Service site, e.g. https://service.nextiq.in or http://nextiq-service.localhost:8001"
-  },
   {
    "fieldname": "api_key",
    "fieldtype": "Password",

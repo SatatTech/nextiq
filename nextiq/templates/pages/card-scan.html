@@ -233,6 +233,29 @@
     color: #111;
   }
 
+  /* ── Tap-to-focus ring ────────────────────────────────────────────── */
+  .focus-ring {
+    position: fixed;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+    pointer-events: none;
+    z-index: 50;
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 0;
+    transition: transform .18s cubic-bezier(.2,0,.2,1), opacity .18s;
+  }
+  .focus-ring.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .focus-ring.hide {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.8);
+    transition: transform .25s, opacity .25s;
+  }
+
   /* ── Scan overlay ─────────────────────────────────────────────────── */
   .scan-overlay {
     position: absolute;
@@ -556,6 +579,7 @@
 
   <video id="video-main" autoplay playsinline muted></video>
   <div class="capture-flash" id="capture-flash"></div>
+  <div class="focus-ring" id="focus-ring"></div>
 
   <!-- Header: balance pill (left) + flash toggle (right) -->
   <div class="header">
@@ -694,6 +718,56 @@
     function stopCamera() {
       if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
     }
+
+    // ── Tap-to-focus ──────────────────────────────────────────────────────
+    const focusRing = document.getElementById("focus-ring");
+    let focusTimer = null;
+
+    function showFocusRing(x, y) {
+      focusRing.style.left = x + "px";
+      focusRing.style.top  = y + "px";
+      focusRing.classList.remove("hide");
+      focusRing.classList.add("show");
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => {
+        focusRing.classList.replace("show", "hide");
+      }, 1200);
+    }
+
+    async function tapToFocus(x, y) {
+      if (!mediaStream) return;
+      const track = mediaStream.getVideoTracks()[0];
+      if (!track) return;
+
+      showFocusRing(x, y);
+
+      // Normalize tap coords to [0,1] range for pointsOfInterest
+      const nx = x / window.innerWidth;
+      const ny = y / window.innerHeight;
+
+      try {
+        const caps = track.getCapabilities();
+        if (caps.focusMode && caps.focusMode.includes("manual") && caps.pointsOfInterest) {
+          await track.applyConstraints({
+            advanced: [{ focusMode: "manual", pointsOfInterest: [{ x: nx, y: ny }] }],
+          });
+          // Return to continuous after 2 s so camera stays sharp
+          setTimeout(() => {
+            if (track.readyState === "live" && caps.focusMode.includes("continuous")) {
+              track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+            }
+          }, 2000);
+        }
+      } catch (_) {
+        // Browser/device doesn't support manual focus — ring still shows as feedback
+      }
+    }
+
+    video.addEventListener("click", e => tapToFocus(e.clientX, e.clientY));
+    video.addEventListener("touchend", e => {
+      const t = e.changedTouches[0];
+      tapToFocus(t.clientX, t.clientY);
+    }, { passive: true });
 
     // ── Auto-scan toggle (flash icon) ─────────────────────────────────────
     btnFlash.classList.toggle("on", autoScanOn);

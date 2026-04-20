@@ -7,10 +7,11 @@ import hmac
 import ipaddress
 import secrets
 import traceback
-import urllib.parse
 
 import frappe
 import requests
+
+from nextiq.constants import SERVICE_URL
 
 # Fields allowed when creating a Lead from scan data — mirrors the service-side list
 _ALLOWED_LEAD_FIELDS = frozenset({
@@ -23,8 +24,6 @@ _MAX_FIELD_LEN = 500   # max characters per Lead field value
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-
-_BLOCKED_HOSTS = frozenset({"metadata.google.internal", "169.254.169.254"})
 
 
 def _get_client_ip():
@@ -72,29 +71,6 @@ def _rate_limit(key, max_per_minute):
 			f"Rate limit Redis check failed for key '{key}' — allowing (fail-open)"
 		)
 		return True
-
-
-def _validate_service_url(url):
-	"""
-	Block private/loopback IP targets in NextIQ Settings.service_url.
-	Returns an error string, or None if the URL is acceptable.
-	"""
-	try:
-		parsed = urllib.parse.urlparse(url)
-	except Exception:
-		return "service_url could not be parsed."
-	if parsed.scheme not in ("http", "https"):
-		return "service_url must be http or https."
-	hostname = (parsed.hostname or "").lower()
-	if hostname in _BLOCKED_HOSTS:
-		return f"service_url hostname '{hostname}' is not permitted."
-	try:
-		ip = ipaddress.ip_address(hostname)
-		if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-			return "service_url must not point to a private or internal address."
-	except ValueError:
-		pass  # domain name — fine
-	return None
 
 
 # ── Public endpoints (called from card-scan portal JS) ───────────────────────
@@ -347,21 +323,10 @@ def _fire_scan_to_service(log_name):
 		frappe.db.commit()
 
 		settings = frappe.get_single("NextIQ Settings")
-		if not settings.service_url or not settings.api_key:
-			raise Exception("NextIQ Settings not configured. Please set Service URL and API Key.")
+		if not settings.api_key:
+			raise Exception("NextIQ Settings not configured. Please set the API Key.")
 
-		service_url = settings.service_url.rstrip("/")
-		api_key     = settings.get_password("api_key")
-
-		# ── Validate service_url (SSRF + HTTP warning) ────────────────────────
-		url_err = _validate_service_url(service_url)
-		if url_err:
-			raise Exception(f"NextIQ Settings: invalid service_url — {url_err}")
-		if service_url.startswith("http://"):
-			logger.warning(
-				"[NextIQ] service_url uses plain HTTP — data is unencrypted in transit. "
-				"Use HTTPS in production."
-			)
+		api_key = settings.get_password("api_key")
 
 		log = frappe.get_doc("Card Scan Log", log_name)
 		if not log.merged_image:
@@ -379,11 +344,11 @@ def _fire_scan_to_service(log_name):
 			+ "/api/method/nextiq.api.scan_callback"
 		)
 
-		logger.info(f"[NextIQ] Calling service at {service_url}, job_id={log.job_id}")
+		logger.info(f"[NextIQ] Calling service at {SERVICE_URL}, job_id={log.job_id}")
 
 		try:
 			response = requests.post(
-				f"{service_url}/api/method/nextiq_service.api.process_scan",
+				f"{SERVICE_URL}/api/method/nextiq_service.api.process_scan",
 				json={
 					# api_key is sent in the Authorization header, not the body,
 					# so it never appears in Frappe's form_dict or debug logs.
@@ -402,8 +367,8 @@ def _fire_scan_to_service(log_name):
 			)
 		except requests.exceptions.ConnectionError:
 			raise Exception(
-				f"Cannot reach NextIQ Service at {service_url}. "
-				"Please check the Service URL in NextIQ Settings."
+				f"Cannot reach NextIQ Service at {SERVICE_URL}. "
+				"Please contact support."
 			)
 		except requests.exceptions.Timeout:
 			raise Exception(
@@ -464,20 +429,13 @@ def _send_feedback_to_service(log_name, feedback_type):
 	try:
 		log = frappe.get_doc("Card Scan Log", log_name)
 		settings = frappe.get_single("NextIQ Settings")
-		if not settings.service_url or not settings.api_key:
+		if not settings.api_key:
 			return
 
-		service_url = settings.service_url.rstrip("/")
-		api_key     = settings.get_password("api_key")
-
-		url_err = _validate_service_url(service_url)
-		if url_err:
-			frappe.log_error(f"Feedback skipped — invalid service_url: {url_err}",
-							 f"NextIQ: Feedback Send Failed: {log_name}")
-			return
+		api_key = settings.get_password("api_key")
 
 		requests.post(
-			f"{service_url}/api/method/nextiq_service.api.receive_scan_feedback",
+			f"{SERVICE_URL}/api/method/nextiq_service.api.receive_scan_feedback",
 			json={
 				"job_id":          log.job_id,
 				"feedback_type":   feedback_type,
@@ -619,16 +577,15 @@ def get_live_balance():
 	Returns the service response dict, or {"success": False, ...} on error.
 	"""
 	settings = frappe.get_single("NextIQ Settings")
-	if not settings.service_url or not settings.api_key:
-		frappe.throw("NextIQ Settings not configured (Service URL or API Key missing).",
+	if not settings.api_key:
+		frappe.throw("NextIQ Settings not configured (API Key missing).",
 					 title="Not Configured")
 
-	service_url = settings.service_url.rstrip("/")
-	api_key     = settings.get_password("api_key")
+	api_key = settings.get_password("api_key")
 
 	try:
 		resp = requests.get(
-			f"{service_url}/api/method/nextiq_service.api.check_quota",
+			f"{SERVICE_URL}/api/method/nextiq_service.api.check_quota",
 			headers={
 				"X-NextIQ-API-Key": api_key,
 				"Content-Type":     "application/json",
@@ -636,7 +593,7 @@ def get_live_balance():
 			timeout=10,
 		)
 	except requests.exceptions.ConnectionError:
-		frappe.throw(f"Cannot reach NextIQ Service at {service_url}.",
+		frappe.throw(f"Cannot reach NextIQ Service at {SERVICE_URL}.",
 					 title="Connection Error")
 	except requests.exceptions.Timeout:
 		frappe.throw("NextIQ Service did not respond in time.", title="Timeout")
