@@ -571,10 +571,165 @@
   .toast-sub {
     display: none;
   }
+
+  /* ── Update blocker ───────────────────────────────────────────────── */
+  .update-blocker {
+    position: fixed;
+    inset: 0;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .update-card {
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 16px;
+    padding: 40px 32px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+  }
+
+  .update-icon {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 20px;
+  }
+
+  .update-card h2 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 12px;
+  }
+
+  .update-card p {
+    color: rgba(255, 255, 255, .55);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0 0 8px;
+  }
+
+  .update-versions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px 0 0;
+  }
+
+  .update-version-pill {
+    background: rgba(251, 191, 36, .12);
+    border: 1px solid rgba(251, 191, 36, .28);
+    color: #fbbf24;
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .update-version-pill span {
+    display: block;
+    color: rgba(251, 191, 36, .55);
+    font-size: 10px;
+    font-weight: 400;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .update-contact {
+    color: rgba(255, 255, 255, .32) !important;
+    font-size: 12px !important;
+    margin-top: 4px !important;
+  }
+
+  .update-check-btn {
+    margin-top: 24px;
+    display: inline-block;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .15);
+    color: rgba(255, 255, 255, .75);
+    border-radius: 10px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+  }
+
+  .update-check-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, .13);
+    border-color: rgba(255, 255, 255, .25);
+  }
+
+  .update-check-btn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  .update-check-msg {
+    margin-top: 10px !important;
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, .4) !important;
+    min-height: 16px;
+  }
 </style>
 {% endblock %}
 
 {% block page_content %}
+{% if needs_mandatory_update %}
+<div class="update-blocker">
+  <div class="update-card">
+    <div class="update-icon">⚠️</div>
+    <h2>Update Required</h2>
+    <p>This site is running NextIQ v{{ current_version }}. Version {{ service_min_version }} or later is required to use the scanner.</p>
+    <p class="update-contact">Contact your administrator to update the NextIQ app.</p>
+    <div class="update-versions">
+      <div class="update-version-pill">
+        <span>Installed</span>
+        {{ current_version }}
+      </div>
+      <div class="update-version-pill">
+        <span>Required</span>
+        {{ service_min_version }}
+      </div>
+    </div>
+    <button class="update-check-btn" id="btn-check-update" onclick="checkForUpdates()">Check for Updates</button>
+    <p class="update-check-msg" id="update-check-msg"></p>
+  </div>
+</div>
+<script>
+function checkForUpdates() {
+  var btn = document.getElementById("btn-check-update");
+  var msg = document.getElementById("update-check-msg");
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  msg.textContent = "";
+  frappe.call({
+    method: "nextiq.version_check.check_service_version",
+    callback: function(r) {
+      if (r.exc) {
+        btn.disabled = false;
+        btn.textContent = "Check for Updates";
+        msg.textContent = "Check failed. Please try again.";
+        return;
+      }
+      // Always reload so version pills and block state reflect fresh DB data
+      location.reload();
+    },
+    error: function() {
+      btn.disabled = false;
+      btn.textContent = "Check for Updates";
+      msg.textContent = "Could not connect to the service. Please try again.";
+    }
+  });
+}
+</script>
+{% else %}
 <div class="scanner-root">
 
   <video id="video-main" autoplay playsinline muted></video>
@@ -645,9 +800,11 @@
   <span class="toast-dot" id="toast-dot"></span>
   <span class="toast-text" id="toast-text"></span>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block script %}
+{% if not needs_mandatory_update %}
 <script>
   (function () {
     "use strict";
@@ -1099,4 +1256,5 @@
 
   })();
 </script>
+{% endif %}
 {% endblock %}
