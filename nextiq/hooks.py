@@ -1,9 +1,11 @@
 app_name = "nextiq"
 app_title = "NextIQ"
 app_publisher = "krushang.patel@satat.tech"
-app_description = "NextIQ — Business card scan portal for ERPNext. Calls NextIQ Service for AI processing."
+app_description = "Scan business cards and instantly create ERPNext leads using AI. Install on any ERPNext site to enable one-tap card capture for your team."
 app_email = "krushang.patel@satat.tech"
 app_license = "mit"
+
+boot_session = "nextiq.boot.boot_session"
 
 # Apps
 # ------------------
@@ -26,7 +28,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/nextiq/css/nextiq.css"
-# app_include_js = "/assets/nextiq/js/nextiq.js"
+app_include_js = "/assets/nextiq/js/nextiq.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/nextiq/css/nextiq.css"
@@ -82,8 +84,8 @@ app_license = "mit"
 # Installation
 # ------------
 
-# before_install = "nextiq.install.before_install"
-# after_install = "nextiq.install.after_install"
+after_install = "nextiq.version_check.check_service_version"
+after_migrate = "nextiq.version_check.check_service_version"
 
 # Uninstallation
 # ------------
@@ -148,23 +150,11 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"nextiq.tasks.all"
-# 	],
-# 	"daily": [
-# 		"nextiq.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"nextiq.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"nextiq.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"nextiq.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"hourly": [
+		"nextiq.version_check.check_service_version",
+	],
+}
 
 # Testing
 # -------

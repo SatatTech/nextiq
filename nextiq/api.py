@@ -11,7 +11,9 @@ import traceback
 import frappe
 import requests
 
+import nextiq
 from nextiq.constants import SERVICE_URL
+from nextiq.version_check import _version_lt
 
 # Fields allowed when creating a Lead from scan data — mirrors the service-side list
 _ALLOWED_LEAD_FIELDS = frozenset({
@@ -88,6 +90,17 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg"):
 	Returns immediately: {"log_name": str}
 	The browser can close after this — Lead is created via background + callback.
 	"""
+	# Block if the installed app is below the service-required minimum version
+	_service_min = frappe.db.get_value(
+		"NextIQ Settings", "NextIQ Settings", "service_min_version"
+	) or ""
+	if _service_min and _version_lt(nextiq.__version__, _service_min):
+		frappe.throw(
+			"The NextIQ app on this site requires an update before scanning can continue. "
+			"Please ask your administrator to update the app.",
+			title="App Update Required",
+		)
+
 	# Rate limit: 10 scans per minute per user (hash user to keep plaintext out of Redis)
 	_user_hash = hashlib.sha256(frappe.session.user.encode()).hexdigest()
 	if not _rate_limit(f"nextiq_scan:{_user_hash}", max_per_minute=10):
@@ -366,6 +379,7 @@ def _fire_scan_to_service(log_name):
 				headers={
 					"Content-Type": "application/json",
 					"X-NextIQ-API-Key": api_key,
+					"X-NextIQ-Client-Version": nextiq.__version__,
 				},
 				timeout=15,  # service should accept in <1s — short timeout
 			)
