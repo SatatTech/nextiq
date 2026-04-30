@@ -74,7 +74,7 @@
    "fieldtype": "Data",
    "label": "Job ID",
    "read_only": 1,
-   "description": "Unique token linking this log to the nextiq_service scan job."
+   "description": "Unique token linking this record to the processing job on the NextIQ platform."
   },
   {
    "fieldname": "cb_secret",
@@ -82,7 +82,7 @@
    "label": "Callback Secret",
    "hidden": 1,
    "read_only": 1,
-   "description": "Single-use secret that verifies the callback is from nextiq_service. Cleared after use."
+   "description": "Single-use token that authenticates the result callback from the NextIQ platform. Cleared automatically after use."
   },
   {
    "fieldname": "column_break_pxss",

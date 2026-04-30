@@ -3,7 +3,7 @@ name = "nextiq"
 authors = [
     { name = "krushang.patel@satat.tech", email = "krushang.patel@satat.tech"}
 ]
-description = "NextIQ Wrapper App"
+description = "AI-powered business card scanning for ERPNext. Captures card details and creates leads automatically."
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
