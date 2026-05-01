@@ -20,8 +20,11 @@ _ALLOWED_LEAD_FIELDS = frozenset({
 	"salutation", "first_name", "middle_name", "last_name",
 	"gender", "job_title", "email_id", "mobile_no", "whatsapp_no",
 	"phone", "phone_ext", "company_name", "website",
-	"fax", "city", "state", "country",
+	"fax",
 })
+
+# Address fields are stored in Address doctype (linked to Lead), not on Lead itself
+_ADDRESS_FIELDS = frozenset({"address_line1", "address_line2", "city", "state", "country"})
 _MAX_FIELD_LEN = 500   # max characters per Lead field value
 
 # Map Frappe DocType names (as they appear in "Could not find X: Y" errors) to
@@ -54,9 +57,11 @@ _FIELD_LABEL_TO_NAME = {
 	"company":      "company_name",
 	"website":      "website",
 	"fax":          "fax",
-	"city":         "city",
-	"state":        "state",
-	"country":      "country",
+	"address line 1": "address_line1",
+	"address line 2": "address_line2",
+	"city":           "city",
+	"state":          "state",
+	"country":        "country",
 }
 
 
@@ -84,6 +89,63 @@ def _find_bad_field(error_msg, data):
 		if label in err_lower and field in data:
 			return field
 	return None
+
+
+def _create_lead_address(lead_name, address_data):
+	"""Create an Office Address record linked to the given Lead.
+
+	Invalid fields are stripped one-by-one and retried (same pattern as lead creation).
+	Any skipped fields are noted as a comment on the Lead. Errors are always logged,
+	never raised — address failure must not prevent lead creation.
+	"""
+	try:
+		remaining = dict(address_data)
+		skipped = {}
+
+		for _attempt in range(len(remaining) + 1):
+			if not remaining:
+				break
+			try:
+				address = frappe.get_doc({
+					"doctype": "Address",
+					"address_title": lead_name,
+					"address_type": "Office",
+					"address_line1": remaining.get("address_line1"),
+					"address_line2": remaining.get("address_line2"),
+					"city": remaining.get("city"),
+					"state": remaining.get("state"),
+					"country": remaining.get("country"),
+					"links": [{"link_doctype": "Lead", "link_name": lead_name}],
+				})
+				address.insert(ignore_permissions=True)
+				frappe.db.commit()
+				break
+			except frappe.ValidationError as e:
+				frappe.db.rollback()
+				bad_field = _find_bad_field(str(e), remaining)
+				if bad_field:
+					skipped[bad_field] = remaining.pop(bad_field)
+				else:
+					raise
+		else:
+			raise frappe.ValidationError("All address fields were invalid; address could not be created.")
+
+		if skipped:
+			lines = ["<b>NextIQ: the following address fields were skipped (invalid values):</b><ul>"]
+			for f, v in skipped.items():
+				lines.append(f"<li><b>{f}</b>: {v}</li>")
+			lines.append("</ul>")
+			frappe.get_doc({
+				"doctype": "Comment",
+				"comment_type": "Info",
+				"reference_doctype": "Lead",
+				"reference_name": lead_name,
+				"content": "".join(lines),
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
+
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"NextIQ: Address creation failed for Lead {lead_name}")
 
 
 class _QuotaExceededError(Exception):
@@ -275,14 +337,18 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 
 	if success:
 		lead_name = None
+		address_data = {}
 		if data and isinstance(data, dict):
 			# Re-validate on this side: only known Lead fields, values truncated to 500 chars.
 			# Defense-in-depth even though the service already filters by ALLOWED_LEAD_FIELDS.
-			data = {
+			# Address fields are separated out and stored in the Address doctype, not on Lead.
+			all_data = {
 				k: str(v)[:_MAX_FIELD_LEN]
 				for k, v in data.items()
-				if k in _ALLOWED_LEAD_FIELDS and v not in (None, "")
+				if k in (_ALLOWED_LEAD_FIELDS | _ADDRESS_FIELDS) and v not in (None, "")
 			}
+			address_data = {k: v for k, v in all_data.items() if k in _ADDRESS_FIELDS}
+			data = {k: v for k, v in all_data.items() if k in _ALLOWED_LEAD_FIELDS}
 		if data:
 			skipped_fields = {}
 			try:
@@ -328,6 +394,9 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 						"content": "".join(lines),
 					}).insert(ignore_permissions=True)
 					frappe.db.commit()
+
+				if lead_name and address_data:
+					_create_lead_address(lead_name, address_data)
 
 			except frappe.exceptions.DuplicateEntryError as e:
 				err_msg = str(e)[:500] or "A lead with this email address already exists."
@@ -477,6 +546,7 @@ def _fire_scan_to_service(log_name):
 					"callback_url":    callback_url,
 					"cb_secret":       log.cb_secret,
 					"customer_log_id": log.name,
+					"scanned_by":      log.scanned_by,
 				},
 				headers={
 					"Content-Type": "application/json",
