@@ -5,7 +5,6 @@ import base64
 import hashlib
 import hmac
 import ipaddress
-import re
 import secrets
 import traceback
 
@@ -34,33 +33,31 @@ _LINK_DOCTYPE_TO_FIELD = {
 	"Salutation": "salutation",
 }
 
-# Pre-validation patterns — applied before attempting lead insert
-_EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
-_URL_RE   = re.compile(r'^https?://', re.IGNORECASE)
-_GENDER_OPTIONS = frozenset({"Male", "Female", "Other", "Prefer Not To Say"})
-_SALUTATION_OPTIONS = frozenset({"Mr", "Ms", "Mrs", "Dr", "Prof"})
-
-
-def _is_valid_field_value(field, value):
-	"""Return True if value passes format validation for this Lead field."""
-	if field == "email_id":
-		return bool(_EMAIL_RE.match(value))
-	if field in ("mobile_no", "whatsapp_no", "phone", "fax"):
-		# Strip formatting characters and require at least 3 digits
-		digits = re.sub(r'[\s\(\)\-\.\+x#*,]', '', value)
-		return digits.isdigit() and len(digits) >= 3
-	if field == "phone_ext":
-		digits = re.sub(r'\D', '', value)
-		return 1 <= len(digits) <= 10
-	if field == "website":
-		return bool(_URL_RE.match(value))
-	if field == "gender":
-		return value in _GENDER_OPTIONS
-	if field == "salutation":
-		return value in _SALUTATION_OPTIONS
-	# Text fields (first_name, last_name, job_title, company_name, city, state, country, …)
-	# have no format constraint beyond being non-empty — already guaranteed by the caller.
-	return True
+# Maps lowercase field labels (as Frappe uses them in error messages) to Lead field names.
+# Lets _find_bad_field identify any field from a ValidationError, not just link fields.
+_FIELD_LABEL_TO_NAME = {
+	"salutation":   "salutation",
+	"first name":   "first_name",
+	"middle name":  "middle_name",
+	"last name":    "last_name",
+	"gender":       "gender",
+	"job title":    "job_title",
+	"email id":     "email_id",
+	"email":        "email_id",
+	"mobile no":    "mobile_no",
+	"mobile":       "mobile_no",
+	"whatsapp no":  "whatsapp_no",
+	"whatsapp":     "whatsapp_no",
+	"phone":        "phone",
+	"phone ext":    "phone_ext",
+	"company name": "company_name",
+	"company":      "company_name",
+	"website":      "website",
+	"fax":          "fax",
+	"city":         "city",
+	"state":        "state",
+	"country":      "country",
+}
 
 
 def _find_bad_field(error_msg, data):
@@ -68,6 +65,7 @@ def _find_bad_field(error_msg, data):
 	Parse a Frappe ValidationError message and return the Lead field name
 	that caused it, or None if it cannot be determined.
 	"""
+	import re
 	# "Could not find {DocType}: {value}" — Link field resolution failure
 	m = re.search(r"Could not find ([\w ]+):", error_msg)
 	if m:
@@ -75,9 +73,15 @@ def _find_bad_field(error_msg, data):
 		field = _LINK_DOCTYPE_TO_FIELD.get(doctype) or _LINK_DOCTYPE_TO_FIELD.get(doctype.lower())
 		if field and field in data:
 			return field
-	# Fallback: if any field's current value appears verbatim in the error, that's the culprit
+	# Check if any field's current value appears verbatim in the error message
 	for field, value in data.items():
 		if value and str(value) in error_msg:
+			return field
+	# Check if any field label appears in the error message
+	# (e.g. "Value for Gender must be one of …", "Invalid Email Id")
+	err_lower = error_msg.lower()
+	for label, field in _FIELD_LABEL_TO_NAME.items():
+		if label in err_lower and field in data:
 			return field
 	return None
 
@@ -281,14 +285,6 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			}
 		if data:
 			skipped_fields = {}
-
-			# Pre-validate every field before attempting insert.
-			# Strip any value that fails format checks into skipped_fields so the
-			# lead is still created and a comment records what was dropped.
-			for _field in list(data.keys()):
-				if not _is_valid_field_value(_field, data[_field]):
-					skipped_fields[_field] = data.pop(_field)
-
 			try:
 				# Retry loop: on ValidationError, strip the offending field and try again.
 				# This handles AI values that don't match ERPNext options (e.g. country="BHARAT").
