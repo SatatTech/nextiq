@@ -254,6 +254,10 @@ def _create_crm_lead(data, scanned_by, log_name):
 		if k not in _CRM_DROP_FIELDS
 	}
 
+	# CRM Lead requires first_name — use organization name as fallback for company-only cards
+	if not crm_data.get("first_name") and crm_data.get("organization"):
+		crm_data["first_name"] = crm_data["organization"]
+
 	skipped_fields = {}
 	lead_name = None
 
