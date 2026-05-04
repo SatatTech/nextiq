@@ -26,7 +26,7 @@ _ALLOWED_LEAD_FIELDS = frozenset({
 })
 
 # Address fields are stored in Address doctype (linked to Lead), not on Lead itself
-_ADDRESS_FIELDS = frozenset({"address_line1", "address_line2", "city", "state", "country"})
+_ADDRESS_FIELDS = frozenset({"address_line1", "address_line2", "city", "state", "pincode", "country"})
 _MAX_FIELD_LEN = 500   # max characters per Lead field value
 
 # CRM Lead uses different field names for 2 fields; 3 fields don't exist in CRM Lead at all
@@ -68,6 +68,10 @@ _FIELD_LABEL_TO_NAME = {
 	"city":           "city",
 	"state":          "state",
 	"country":        "country",
+	"pincode":        "pincode",
+	"postal code":    "pincode",
+	"zip code":       "pincode",
+	"pin code":       "pincode",
 }
 
 
@@ -108,18 +112,34 @@ def _create_lead_address(lead_name, address_data):
 		remaining = dict(address_data)
 		skipped = {}
 
+		# address_line1 is mandatory in Frappe's Address doctype.
+		# The AI extracts city/state/country but never address_line1, so fall back to
+		# the lead's company name (or the lead name itself) to satisfy the constraint.
+		company_name = frappe.db.get_value("Lead", lead_name, "company_name") or lead_name
+		if not remaining.get("address_line1"):
+			remaining["address_line1"] = company_name
+
+		# Sanitize pincode — strip spaces and non-digit characters so "395 007" → "395007"
+		if remaining.get("pincode"):
+			clean_pin = re.sub(r"\D", "", remaining["pincode"])
+			if clean_pin:
+				remaining["pincode"] = clean_pin
+			else:
+				remaining.pop("pincode")
+
 		for _attempt in range(len(remaining) + 1):
 			if not remaining:
 				break
 			try:
 				address = frappe.get_doc({
 					"doctype": "Address",
-					"address_title": lead_name,
+					"address_title": company_name,
 					"address_type": "Office",
 					"address_line1": remaining.get("address_line1"),
 					"address_line2": remaining.get("address_line2"),
 					"city": remaining.get("city"),
 					"state": remaining.get("state"),
+					"pincode": remaining.get("pincode"),
 					"country": remaining.get("country"),
 					"links": [{"link_doctype": "Lead", "link_name": lead_name}],
 				})
@@ -150,8 +170,31 @@ def _create_lead_address(lead_name, address_data):
 			}).insert(ignore_permissions=True)
 			frappe.db.commit()
 
-	except Exception:
+	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), f"NextIQ: Address creation failed for Lead {lead_name}")
+		# Leave a comment on the Lead so the sales rep can add the address manually
+		try:
+			err_str = str(e)
+			lines = ["<b>NextIQ: Address could not be created automatically.</b>"]
+			if err_str:
+				lines.append(f"<br><b>Reason:</b> {html.escape(err_str)}")
+			if address_data:
+				lines.append("<br>Address data extracted from the card:<ul>")
+				for f, v in address_data.items():
+					if v:
+						lines.append(f"<li><b>{f}</b>: {html.escape(str(v))}</li>")
+				lines.append("</ul>")
+			lines.append("<p>Please add the address manually to this lead.</p>")
+			frappe.get_doc({
+				"doctype": "Comment",
+				"comment_type": "Info",
+				"reference_doctype": "Lead",
+				"reference_name": lead_name,
+				"content": "".join(lines),
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
+		except Exception:
+			pass
 
 
 def _create_erpnext_lead(data, address_data, scanned_by, log_name):
@@ -449,14 +492,22 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 		lead_name = None
 		crm_lead_name = None
 		address_data = {}
+		original_data = dict(data) if data and isinstance(data, dict) else {}
 		if data and isinstance(data, dict):
-			all_data = {
+			# Pull the nested address block out first — service sends it as {"address": {...}}
+			raw_address = data.pop("address", None)
+			if isinstance(raw_address, dict):
+				address_data = {
+					k: str(v)[:_MAX_FIELD_LEN]
+					for k, v in raw_address.items()
+					if k in _ADDRESS_FIELDS and v not in (None, "")
+				}
+			# Validate and truncate remaining flat lead fields
+			data = {
 				k: str(v)[:_MAX_FIELD_LEN]
 				for k, v in data.items()
-				if k in (_ALLOWED_LEAD_FIELDS | _ADDRESS_FIELDS) and v not in (None, "")
+				if k in _ALLOWED_LEAD_FIELDS and v not in (None, "")
 			}
-			address_data = {k: v for k, v in all_data.items() if k in _ADDRESS_FIELDS}
-			data = {k: v for k, v in all_data.items() if k in _ALLOWED_LEAD_FIELDS}
 		if data:
 			destination = frappe.db.get_value(
 				"NextIQ Settings", "NextIQ Settings", "lead_destination"
@@ -542,7 +593,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			"lead": lead_name,
 			"crm_lead": crm_lead_name,
 			"processed_at": frappe.utils.now(),
-			"ai_response": frappe.as_json(data or {}),
+			"ai_response": frappe.as_json(original_data or {}),
 			"cb_secret": "",   # single-use — clear after successful callback
 		}
 		if scans_remaining is not None:
