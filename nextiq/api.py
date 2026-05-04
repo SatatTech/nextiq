@@ -29,6 +29,10 @@ _ALLOWED_LEAD_FIELDS = frozenset({
 _ADDRESS_FIELDS = frozenset({"address_line1", "address_line2", "city", "state", "country"})
 _MAX_FIELD_LEN = 500   # max characters per Lead field value
 
+# CRM Lead uses different field names for 2 fields; 3 fields don't exist in CRM Lead at all
+_CRM_FIELD_REMAP = {"email_id": "email", "company_name": "organization"}
+_CRM_DROP_FIELDS = frozenset({"whatsapp_no", "phone_ext", "fax"})
+
 # Map Frappe DocType names (as they appear in "Could not find X: Y" errors) to
 # the Lead field name, so _find_bad_field can strip the offending field.
 _LINK_DOCTYPE_TO_FIELD = {
@@ -148,6 +152,106 @@ def _create_lead_address(lead_name, address_data):
 
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), f"NextIQ: Address creation failed for Lead {lead_name}")
+
+
+def _create_erpnext_lead(data, address_data, scanned_by, log_name):
+	"""Create an ERPNext Lead from scan data. Raises on failure."""
+	skipped_fields = {}
+	lead_name = None
+
+	for _attempt in range(len(data) + 1):
+		try:
+			lead_doc_data = {"doctype": "Lead", **data}
+			if scanned_by and scanned_by != "Guest":
+				lead_doc_data["lead_owner"] = scanned_by
+			lead = frappe.get_doc(lead_doc_data)
+			lead.insert(ignore_permissions=True)
+			frappe.db.commit()
+			lead_name = lead.name
+			break
+		except frappe.exceptions.DuplicateEntryError:
+			raise
+		except frappe.ValidationError as e:
+			frappe.db.rollback()
+			bad_field = _find_bad_field(str(e), data)
+			if bad_field:
+				skipped_fields[bad_field] = data.pop(bad_field)
+			else:
+				raise
+	else:
+		raise frappe.ValidationError("All fields were invalid; no lead could be created.")
+
+	if skipped_fields:
+		frappe.db.set_value("Lead", lead_name, {f: None for f in skipped_fields})
+		lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
+		for f, v in skipped_fields.items():
+			lines.append(f"<li><b>{f}</b>: {v}</li>")
+		lines.append("</ul>")
+		frappe.get_doc({
+			"doctype": "Comment",
+			"comment_type": "Info",
+			"reference_doctype": "Lead",
+			"reference_name": lead_name,
+			"content": "".join(lines),
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+
+	if address_data:
+		_create_lead_address(lead_name, address_data)
+
+	_append_scan_note(lead_name, log_name, scanned_by)
+	return lead_name
+
+
+def _create_crm_lead(data, scanned_by, log_name):
+	"""Create a Frappe CRM Lead from scan data. Address fields are dropped — CRM Lead has none."""
+	crm_data = {
+		_CRM_FIELD_REMAP.get(k, k): v
+		for k, v in data.items()
+		if k not in _CRM_DROP_FIELDS
+	}
+
+	skipped_fields = {}
+	lead_name = None
+
+	for _attempt in range(len(crm_data) + 1):
+		try:
+			doc = {"doctype": "CRM Lead", **crm_data}
+			if scanned_by and scanned_by != "Guest":
+				doc["lead_owner"] = scanned_by
+			lead = frappe.get_doc(doc)
+			lead.insert(ignore_permissions=True)
+			frappe.db.commit()
+			lead_name = lead.name
+			break
+		except frappe.exceptions.DuplicateEntryError:
+			raise
+		except frappe.ValidationError as e:
+			frappe.db.rollback()
+			bad_field = _find_bad_field(str(e), crm_data)
+			if bad_field:
+				skipped_fields[bad_field] = crm_data.pop(bad_field)
+			else:
+				raise
+	else:
+		raise frappe.ValidationError("All CRM Lead fields were invalid; no CRM Lead could be created.")
+
+	if skipped_fields:
+		lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
+		for f, v in skipped_fields.items():
+			lines.append(f"<li><b>{f}</b>: {v}</li>")
+		lines.append("</ul>")
+		frappe.get_doc({
+			"doctype": "Comment",
+			"comment_type": "Info",
+			"reference_doctype": "CRM Lead",
+			"reference_name": lead_name,
+			"content": "".join(lines),
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+
+	_append_crm_lead_note(lead_name, log_name, scanned_by)
+	return lead_name
 
 
 class _QuotaExceededError(Exception):
@@ -343,11 +447,9 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 
 	if success:
 		lead_name = None
+		crm_lead_name = None
 		address_data = {}
 		if data and isinstance(data, dict):
-			# Re-validate on this side: only known Lead fields, values truncated to 500 chars.
-			# Defense-in-depth even though the service already filters by ALLOWED_LEAD_FIELDS.
-			# Address fields are separated out and stored in the Address doctype, not on Lead.
 			all_data = {
 				k: str(v)[:_MAX_FIELD_LEN]
 				for k, v in data.items()
@@ -356,56 +458,29 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			address_data = {k: v for k, v in all_data.items() if k in _ADDRESS_FIELDS}
 			data = {k: v for k, v in all_data.items() if k in _ALLOWED_LEAD_FIELDS}
 		if data:
-			skipped_fields = {}
+			destination = frappe.db.get_value(
+				"NextIQ Settings", "NextIQ Settings", "lead_destination"
+			) or "ERPNext"
+			installed = frappe.get_installed_apps()
+			make_erpnext = destination in ("ERPNext", "Both") and "erpnext" in installed
+			make_crm = destination in ("Frappe CRM", "Both") and "crm" in installed
+
 			try:
-				# Retry loop: on ValidationError, strip the offending field and try again.
-				# This handles AI values that don't match ERPNext options (e.g. country="BHARAT").
-				for _attempt in range(len(data) + 1):
-					try:
-						lead_doc_data = {"doctype": "Lead", **data}
-						if scanned_by and scanned_by != "Guest":
-							lead_doc_data["lead_owner"] = scanned_by
-						lead = frappe.get_doc(lead_doc_data)
-						lead.insert(ignore_permissions=True)
-						frappe.db.commit()
-						lead_name = lead.name
-						break
-					except frappe.exceptions.DuplicateEntryError:
-						raise
-					except frappe.ValidationError as e:
-						frappe.db.rollback()
-						bad_field = _find_bad_field(str(e), data)
-						if bad_field:
-							skipped_fields[bad_field] = data.pop(bad_field)
-						else:
-							raise  # can't identify which field — propagate
-				else:
-					raise frappe.ValidationError("All fields were invalid; no lead could be created.")
+				if make_erpnext:
+					lead_name = _create_erpnext_lead(data.copy(), address_data, scanned_by, log_name)
 
-				# Add a comment listing any skipped fields so the sales rep knows what was dropped
-				if skipped_fields:
-					# Null out the skipped fields — without this, Frappe applies doctype
-					# defaults (e.g. country defaults to "India") when the field is absent.
-					frappe.db.set_value("Lead", lead_name,
-						{f: None for f in skipped_fields})
-					lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
-					for f, v in skipped_fields.items():
-						lines.append(f"<li><b>{f}</b>: {v}</li>")
-					lines.append("</ul>")
-					frappe.get_doc({
-						"doctype": "Comment",
-						"comment_type": "Info",
-						"reference_doctype": "Lead",
-						"reference_name": lead_name,
-						"content": "".join(lines),
-					}).insert(ignore_permissions=True)
-					frappe.db.commit()
-
-
-				if lead_name and address_data:
-					_create_lead_address(lead_name, address_data)
-
-				_append_scan_note(lead_name, log_name, scanned_by)
+				if make_crm:
+					if destination == "Both":
+						# Best-effort in Both mode — ERPNext may already have succeeded
+						try:
+							crm_lead_name = _create_crm_lead(data.copy(), scanned_by, log_name)
+						except Exception:
+							frappe.log_error(
+								traceback.format_exc(),
+								f"NextIQ: CRM Lead creation failed for {log_name}",
+							)
+					else:
+						crm_lead_name = _create_crm_lead(data.copy(), scanned_by, log_name)
 
 			except frappe.exceptions.DuplicateEntryError as e:
 				err_msg = str(e)[:500] or "A lead with this email address already exists."
@@ -465,6 +540,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 		success_fields = {
 			"status": "Success",
 			"lead": lead_name,
+			"crm_lead": crm_lead_name,
 			"processed_at": frappe.utils.now(),
 			"ai_response": frappe.as_json(data or {}),
 			"cb_secret": "",   # single-use — clear after successful callback
@@ -652,6 +728,30 @@ def _append_scan_note(lead_name, log_name, scanned_by):
 		)
 
 
+# ── CRM Lead note helper ─────────────────────────────────────────────────────
+
+def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
+	"""Add the scan-time note to the CRM Lead as a Comment. Fails silently."""
+	try:
+		log_notes = frappe.db.get_value("Card Scan Log", log_name, "notes")
+		if not log_notes or not crm_lead_name:
+			return
+		note_html = "<p>" + html.escape(str(log_notes)).replace("\n", "<br>") + "</p>"
+		frappe.get_doc({
+			"doctype": "Comment",
+			"comment_type": "Info",
+			"reference_doctype": "CRM Lead",
+			"reference_name": crm_lead_name,
+			"content": note_html,
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"NextIQ: Note append failed for CRM Lead {crm_lead_name}",
+		)
+
+
 # ── Feedback to service ───────────────────────────────────────────────────────
 
 def _send_feedback_to_service(log_name, feedback_type):
@@ -729,6 +829,18 @@ def _send_scan_notification(log_name, outcome, lead_name=None, message=None, sca
 			frappe.get_traceback(),
 			f"NextIQ: Email notification failed for {log_name}",
 		)
+
+
+# ── Lead destination helper ──────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_installed_lead_destinations():
+	"""Return which lead-capable apps are installed. Used by NextIQ Settings JS to filter options."""
+	installed = frappe.get_installed_apps()
+	return {
+		"has_erpnext": "erpnext" in installed,
+		"has_crm":     "crm" in installed,
+	}
 
 
 # ── Time saved metric ────────────────────────────────────────────────────────

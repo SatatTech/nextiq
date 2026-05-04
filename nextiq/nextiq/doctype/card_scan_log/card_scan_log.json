@@ -19,6 +19,7 @@
   "error_message",
   "section_break_otoj",
   "lead",
+  "crm_lead",
   "column_break_emrn",
   "scans_remaining",
   "job_id",
@@ -58,8 +59,15 @@
    "fieldname": "lead",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Lead Created",
+   "label": "ERPNext Lead",
    "options": "Lead",
+   "read_only": 1
+  },
+  {
+   "fieldname": "crm_lead",
+   "fieldtype": "Link",
+   "label": "CRM Lead",
+   "options": "CRM Lead",
    "read_only": 1
   },
   {
