@@ -64,6 +64,10 @@ _FIELD_LABEL_TO_NAME = {
 	"city":           "city",
 	"state":          "state",
 	"country":        "country",
+	"pincode":        "pincode",
+	"postal code":    "pincode",
+	"zip code":       "pincode",
+	"pin code":       "pincode",
 }
 
 
@@ -110,6 +114,14 @@ def _create_lead_address(lead_name, address_data):
 		company_name = frappe.db.get_value("Lead", lead_name, "company_name") or lead_name
 		if not remaining.get("address_line1"):
 			remaining["address_line1"] = company_name
+
+		# Sanitize pincode — strip spaces and non-digit characters so "395 007" → "395007"
+		if remaining.get("pincode"):
+			clean_pin = re.sub(r"\D", "", remaining["pincode"])
+			if clean_pin:
+				remaining["pincode"] = clean_pin
+			else:
+				remaining.pop("pincode")
 
 		for _attempt in range(len(remaining) + 1):
 			if not remaining:
