@@ -738,7 +738,6 @@ def _fire_scan_to_service(log_name, audio_mime_type=None):
 		}
 		if voice_audio_base64:
 			payload["voice_audio_base64"] = voice_audio_base64
-			payload["voice_language"]     = log.voice_language or "English or Gujarati"
 			payload["audio_mime_type"]    = audio_mime_type or "audio/webm"
 
 		try:

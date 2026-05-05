@@ -712,32 +712,6 @@
     padding: 10px 20px 0;
   }
 
-  /* Language pills */
-  .lang-pills {
-    display: flex;
-    gap: 6px;
-    flex: 1;
-  }
-
-  .lang-pill {
-    padding: 6px 14px;
-    border-radius: 50px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1.5px solid #e5e7eb;
-    background: transparent;
-    color: #6b7280;
-    font-family: inherit;
-    transition: background .15s, border-color .15s, color .15s;
-  }
-
-  .lang-pill.active {
-    background: #111;
-    border-color: #111;
-    color: #fff;
-  }
-
   /* Mic button */
   .btn-mic {
     width: 42px;
@@ -1144,11 +1118,7 @@ function checkForUpdates() {
     </div>
   </div>
   <div class="voice-row">
-    <div class="lang-pills">
-      <button class="lang-pill active" data-lang="English">EN</button>
-      <button class="lang-pill" data-lang="Gujarati">GU</button>
-    </div>
-    <button class="btn-mic" id="btn-mic" title="Hold to record voice note">
+    <button class="btn-mic" id="btn-mic" title="Tap to record voice note">
       <svg viewBox="0 0 24 24">
         <rect x="9" y="2" width="6" height="11" rx="3"/>
         <path d="M5 10a7 7 0 0 0 14 0"/>
@@ -1573,7 +1543,6 @@ function checkForUpdates() {
     // ── Voice recording ────────────────────────────────────────────────────
     let voiceAudioBase64   = null;   // captured audio ready to submit
     let voiceAudioMime     = "audio/webm";
-    let selectedLanguage   = "English";
     let mediaRecorder      = null;
     let recordingChunks    = [];
     let recordingTimer     = null;
@@ -1582,15 +1551,6 @@ function checkForUpdates() {
 
     const btnMic        = document.getElementById("btn-mic");
     const voiceStatus   = document.getElementById("voice-status");
-
-    // Language pill selection
-    document.querySelectorAll(".lang-pill").forEach(pill => {
-      pill.addEventListener("click", () => {
-        document.querySelectorAll(".lang-pill").forEach(p => p.classList.remove("active"));
-        pill.classList.add("active");
-        selectedLanguage = pill.dataset.lang;
-      });
-    });
 
     function _setVoiceStatus(text, cls) {
       voiceStatus.textContent = text;
@@ -1675,7 +1635,6 @@ function checkForUpdates() {
         };
         if (voiceAudioBase64) {
           payload.voice_audio_base64 = voiceAudioBase64;
-          payload.voice_language     = selectedLanguage;
           payload.audio_mime_type    = voiceAudioMime;
         }
         await apiCall("nextiq.api.submit_card_scan", payload);
