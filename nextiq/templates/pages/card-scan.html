@@ -233,20 +233,23 @@
   /* ── Tap-to-focus ring ────────────────────────────────────────────── */
   .focus-ring {
     position: fixed;
-    width: 64px; height: 64px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     border: 2px solid #fff;
-    box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .4);
     pointer-events: none;
     z-index: 50;
     transform: translate(-50%, -50%) scale(1.4);
     opacity: 0;
-    transition: transform .18s cubic-bezier(.2,0,.2,1), opacity .18s;
+    transition: transform .18s cubic-bezier(.2, 0, .2, 1), opacity .18s;
   }
+
   .focus-ring.show {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
+
   .focus-ring.hide {
     opacity: 0;
     transform: translate(-50%, -50%) scale(.8);
@@ -916,12 +919,14 @@
 <div class="update-blocker">
   <div class="update-card">
     <div class="update-icon-wrap">
-      <svg viewBox="0 0 24 24">
-        <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <svg viewBox="0 0 24 24">\
+        <path
+          d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
       </svg>
     </div>
     <h2>Update Required</h2>
-    <p>Your NextIQ app is out of date and can't connect to the scanning service.<br><span class="update-admin-note">Ask your administrator to update the app to continue.</span></p>
+    <p>Your NextIQ app is out of date and can't connect to the scanning service.<br><span class="update-admin-note">Ask
+        your administrator to update the app to continue.</span></p>
     <div class="update-versions">
       <div class="update-version-pill">
         <span>Installed</span>
@@ -939,31 +944,31 @@
   </div>
 </div>
 <script>
-function checkForUpdates() {
-  var btn = document.getElementById("btn-check-update");
-  var msg = document.getElementById("update-check-msg");
-  btn.disabled = true;
-  btn.textContent = "Checking...";
-  msg.textContent = "";
-  frappe.call({
-    method: "nextiq.version_check.check_service_version",
-    callback: function(r) {
-      if (r.exc) {
+  function checkForUpdates() {
+    var btn = document.getElementById("btn-check-update");
+    var msg = document.getElementById("update-check-msg");
+    btn.disabled = true;
+    btn.textContent = "Checking...";
+    msg.textContent = "";
+    frappe.call({
+      method: "nextiq.version_check.check_service_version",
+      callback: function (r) {
+        if (r.exc) {
+          btn.disabled = false;
+          btn.textContent = "Check for Updates";
+          msg.textContent = "Check failed. Please try again.";
+          return;
+        }
+        // Always reload so version pills and block state reflect fresh DB data
+        location.reload();
+      },
+      error: function () {
         btn.disabled = false;
         btn.textContent = "Check for Updates";
-        msg.textContent = "Check failed. Please try again.";
-        return;
+        msg.textContent = "Could not connect to the service. Please try again.";
       }
-      // Always reload so version pills and block state reflect fresh DB data
-      location.reload();
-    },
-    error: function() {
-      btn.disabled = false;
-      btn.textContent = "Check for Updates";
-      msg.textContent = "Could not connect to the service. Please try again.";
-    }
-  });
-}
+    });
+  }
 </script>
 {% else %}
 <div class="scanner-root">
@@ -1022,8 +1027,8 @@ function checkForUpdates() {
     <button class="btn-notes" id="btn-notes" aria-label="Add note">
       <span class="notes-badge" id="notes-badge"></span>
       <svg viewBox="0 0 24 24">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
       </svg>
     </button>
 
@@ -1048,8 +1053,7 @@ function checkForUpdates() {
       <img id="notes-img-back" src="" alt="Back side">
     </div>
   </div>
-  <textarea class="notes-textarea" id="notes-textarea"
-    placeholder="e.g. Met at Booth 14, follow up next week…"
+  <textarea class="notes-textarea" id="notes-textarea" placeholder="e.g. Met at Booth 14, follow up next week…"
     maxlength="2000"></textarea>
   <div class="notes-actions">
     <button class="notes-cancel-btn" id="notes-cancel-btn">Cancel</button>
@@ -1072,14 +1076,14 @@ function checkForUpdates() {
 
 
     // ── State ─────────────────────────────────────────────────────────────
-    let frontDataURL    = null;
-    let mediaStream     = null;
-    let step            = 1;
-    let scansRemaining  = null;
-    let scansAllowed    = null;
-    let noteText        = "";
+    let frontDataURL = null;
+    let mediaStream = null;
+    let step = 1;
+    let scansRemaining = null;
+    let scansAllowed = null;
+    let noteText = "";
     let pendingFrontURL = null;
-    let pendingBackURL  = null;
+    let pendingBackURL = null;
     // "quick" = submit immediately after back scan; "notes" = sheet pops up first
     let scanMode = localStorage.getItem("nextiq_scanmode") || "quick";
 
@@ -1091,22 +1095,22 @@ function checkForUpdates() {
     const tabBack = document.getElementById("tab-back");
     const tabSlider = document.getElementById("tab-slider");
     const thumbSlot = document.getElementById("thumb-slot");
-    const btnShutter      = document.getElementById("btn-shutter");
-    const btnNotes        = document.getElementById("btn-notes");
-    const notesSheet      = document.getElementById("notes-sheet");
-    const notesBackdrop   = document.getElementById("notes-backdrop");
-    const notesTextarea   = document.getElementById("notes-textarea");
+    const btnShutter = document.getElementById("btn-shutter");
+    const btnNotes = document.getElementById("btn-notes");
+    const notesSheet = document.getElementById("notes-sheet");
+    const notesBackdrop = document.getElementById("notes-backdrop");
+    const notesTextarea = document.getElementById("notes-textarea");
     const notesSheetTitle = document.getElementById("notes-sheet-title");
-    const notesCancelBtn  = document.getElementById("notes-cancel-btn");
+    const notesCancelBtn = document.getElementById("notes-cancel-btn");
     const notesPrimaryBtn = document.getElementById("notes-primary-btn");
     const notesCardImages = document.getElementById("notes-card-images");
-    const notesImgFront   = document.getElementById("notes-img-front");
-    const notesImgBack    = document.getElementById("notes-img-back");
-    const modeToggle      = document.getElementById("scan-mode-toggle");
-    const modeSlider      = document.getElementById("scan-mode-slider");
-    const modeOptQuick    = document.getElementById("scan-mode-quick");
-    const modeOptNotes    = document.getElementById("scan-mode-notes");
-    const flashEl         = document.getElementById("capture-flash");
+    const notesImgFront = document.getElementById("notes-img-front");
+    const notesImgBack = document.getElementById("notes-img-back");
+    const modeToggle = document.getElementById("scan-mode-toggle");
+    const modeSlider = document.getElementById("scan-mode-slider");
+    const modeOptQuick = document.getElementById("scan-mode-quick");
+    const modeOptNotes = document.getElementById("scan-mode-notes");
+    const flashEl = document.getElementById("capture-flash");
 
     // ── Tab slider ────────────────────────────────────────────────────────
     function slideTabTo(pill) {
@@ -1128,7 +1132,7 @@ function checkForUpdates() {
     });
 
     // ── Notes bottom sheet ────────────────────────────────────────────────
-    let _sheetSubmitMode  = false;
+    let _sheetSubmitMode = false;
     let _sheetOriginalNote = "";
 
     function updateNotesBadge() {
@@ -1148,14 +1152,14 @@ function checkForUpdates() {
     }
 
     function openNotesSheet(submitMode) {
-      _sheetSubmitMode   = !!submitMode;
+      _sheetSubmitMode = !!submitMode;
       _sheetOriginalNote = noteText;
       notesTextarea.value = noteText;
       notesSheetTitle.textContent = "Add a note";
       _updatePrimaryBtn();
       if (submitMode && pendingFrontURL && pendingBackURL) {
         notesImgFront.src = pendingFrontURL;
-        notesImgBack.src  = pendingBackURL;
+        notesImgBack.src = pendingBackURL;
         notesCardImages.style.display = "flex";
         notesSheet.classList.add("submit-mode");
       } else {
@@ -1175,9 +1179,9 @@ function checkForUpdates() {
     }
 
     function _doSubmitFromSheet() {
-      const note  = notesTextarea.value.trim();
+      const note = notesTextarea.value.trim();
       const front = pendingFrontURL;
-      const back  = pendingBackURL;
+      const back = pendingBackURL;
       pendingFrontURL = null; pendingBackURL = null;
       noteText = ""; notesTextarea.value = ""; updateNotesBadge();
       _closeSheet();
@@ -1219,7 +1223,7 @@ function checkForUpdates() {
     async function startCamera() {
       stopCamera();
       const tries = [
-        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+        { video: { facingMode: { ideal: "environment" }, width: { min: 1280, ideal: 3840 }, height: { min: 720, ideal: 2160 } } },
         { video: { facingMode: "environment" } },
         { video: true },
       ];
@@ -1244,7 +1248,7 @@ function checkForUpdates() {
 
     function showFocusRing(x, y) {
       focusRing.style.left = x + "px";
-      focusRing.style.top  = y + "px";
+      focusRing.style.top = y + "px";
       focusRing.classList.remove("hide");
       focusRing.classList.add("show");
       clearTimeout(focusTimer);
@@ -1273,7 +1277,7 @@ function checkForUpdates() {
           // Return to continuous after 2 s so camera stays sharp
           setTimeout(() => {
             if (track.readyState === "live" && caps.focusMode.includes("continuous")) {
-              track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+              track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => { });
             }
           }, 2000);
         }
@@ -1332,8 +1336,8 @@ function checkForUpdates() {
         const backURL = cropToCardFrame();
         if (scanMode === "notes") {
           pendingFrontURL = frontDataURL;
-          pendingBackURL  = backURL;
-          frontDataURL    = null;
+          pendingBackURL = backURL;
+          frontDataURL = null;
           openNotesSheet(true);
         } else {
           const capturedNote = noteText;
@@ -1508,8 +1512,8 @@ function checkForUpdates() {
         if (step === 1) { frontDataURL = dataURL; goToStep2(); }
         else if (scanMode === "notes") {
           pendingFrontURL = frontDataURL;
-          pendingBackURL  = dataURL;
-          frontDataURL    = null;
+          pendingBackURL = dataURL;
+          frontDataURL = null;
           openNotesSheet(true);
         } else {
           const capturedNote = noteText;
@@ -1529,9 +1533,9 @@ function checkForUpdates() {
       modeOptNotes.classList.toggle("active", mode === "notes");
       btnShutter.classList.toggle("mode-quick", mode === "quick" && step === 2);
       const toggleRect = modeToggle.getBoundingClientRect();
-      const activeOpt  = mode === "quick" ? modeOptQuick : modeOptNotes;
-      const optRect    = activeOpt.getBoundingClientRect();
-      modeSlider.style.left  = (optRect.left - toggleRect.left) + "px";
+      const activeOpt = mode === "quick" ? modeOptQuick : modeOptNotes;
+      const optRect = activeOpt.getBoundingClientRect();
+      modeSlider.style.left = (optRect.left - toggleRect.left) + "px";
       modeSlider.style.width = optRect.width + "px";
     }
 
