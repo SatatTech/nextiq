@@ -866,35 +866,30 @@ def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
 
 def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 	"""
-	Create ERPNext Notes, ToDo tasks, and Events from AI-extracted voice note data.
+	Create ERPNext summary note, ToDo tasks, and Events from AI-extracted voice note data.
 	Fails silently — voice note errors must never block the lead creation flow.
 	"""
 	if not lead_name or not voice_notes or not isinstance(voice_notes, dict):
 		return
 
-	notes   = voice_notes.get("notes") or []
-	tasks   = voice_notes.get("tasks") or []
-	events  = voice_notes.get("events") or []
+	summary_note = voice_notes.get("summary_note") or ""
+	tasks        = voice_notes.get("tasks") or []
+	events       = voice_notes.get("events") or []
 
-	if not notes and not tasks and not events:
+	if not summary_note and not tasks and not events:
 		return
 
 	try:
-		# ── Notes ──────────────────────────────────────────────────────────────
-		if notes:
-			note_lines = ["<p><strong>Voice Extracted Notes:</strong></p>"]
-			for n in notes:
-				if isinstance(n, str) and n.strip():
-					note_lines.append("<p>" + html.escape(n.strip()) + "</p>")
-			if len(note_lines) > 1:
-				lead_doc = frappe.get_doc("Lead", lead_name)
-				lead_doc.append("notes", {
-					"note": "".join(note_lines),
-					"added_by": scanned_by or frappe.session.user,
-					"added_on": frappe.utils.now_datetime(),
-				})
-				lead_doc.save(ignore_permissions=True)
-				frappe.db.commit()
+		# ── Summary note (bilingual transcript + structured breakdown) ──────────
+		if summary_note.strip():
+			lead_doc = frappe.get_doc("Lead", lead_name)
+			lead_doc.append("notes", {
+				"note":     summary_note,
+				"added_by": scanned_by or frappe.session.user,
+				"added_on": frappe.utils.now_datetime(),
+			})
+			lead_doc.save(ignore_permissions=True)
+			frappe.db.commit()
 
 		# ── Tasks (ToDo) ────────────────────────────────────────────────────────
 		for task in tasks:
