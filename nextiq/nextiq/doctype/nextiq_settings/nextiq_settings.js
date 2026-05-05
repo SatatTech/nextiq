@@ -1,5 +1,22 @@
 frappe.ui.form.on("NextIQ Settings", {
 	refresh(frm) {
+		// Filter lead_destination options to only apps that are installed
+		frappe.call({
+			method: "nextiq.api.get_installed_lead_destinations",
+			callback(r) {
+				if (!r.message) return;
+				const { has_erpnext, has_crm } = r.message;
+				let options = [];
+				if (has_erpnext) options.push("ERPNext");
+				if (has_crm)     options.push("Frappe CRM");
+				if (has_erpnext && has_crm) options.push("Both");
+				frm.set_df_property("lead_destination", "options", options.join("\n"));
+				if (options.length && !options.includes(frm.doc.lead_destination)) {
+					frm.set_value("lead_destination", options[0]);
+				}
+			},
+		});
+
 		frm.add_custom_button(__("Check Updates"), function () {
 			frappe.show_alert({ message: __("Checking version status…"), indicator: "blue" });
 			frappe.call({

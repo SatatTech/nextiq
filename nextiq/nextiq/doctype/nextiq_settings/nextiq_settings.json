@@ -5,6 +5,8 @@
  "engine": "InnoDB",
  "field_order": [
   "api_key",
+  "lead_destination_section",
+  "lead_destination",
   "version_status_section",
   "service_min_version",
   "version_col_break_1",
@@ -18,6 +20,20 @@
    "fieldname": "api_key",
    "fieldtype": "Password",
    "label": "API Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lead_destination_section",
+   "fieldtype": "Section Break",
+   "label": "Lead Destination"
+  },
+  {
+   "default": "ERPNext",
+   "description": "Choose where to create a lead when a business card is scanned successfully.",
+   "fieldname": "lead_destination",
+   "fieldtype": "Select",
+   "label": "Create Lead In",
+   "options": "ERPNext\nFrappe CRM\nBoth",
    "reqd": 1
   },
   {
