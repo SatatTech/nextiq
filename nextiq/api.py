@@ -97,8 +97,8 @@ def _find_bad_field(error_msg, data):
 	return None
 
 
-def _create_lead_address(lead_name, address_data):
-	"""Create an Office Address record linked to the given Lead.
+def _create_lead_address(lead_name, address_data, address_type="Office"):
+	"""Create an Address record linked to the given Lead.
 
 	Invalid fields are stripped one-by-one and retried (same pattern as lead creation).
 	Any skipped fields are noted as a comment on the Lead. Errors are always logged,
@@ -130,7 +130,7 @@ def _create_lead_address(lead_name, address_data):
 				address = frappe.get_doc({
 					"doctype": "Address",
 					"address_title": company_name,
-					"address_type": "Office",
+					"address_type": address_type,
 					"address_line1": remaining.get("address_line1"),
 					"address_line2": remaining.get("address_line2"),
 					"city": remaining.get("city"),
@@ -153,18 +153,21 @@ def _create_lead_address(lead_name, address_data):
 			raise frappe.ValidationError("All address fields were invalid; address could not be created.")
 
 		if skipped:
-			lines = ["<b>NextIQ: the following address fields were skipped (invalid values):</b><ul>"]
-			for f, v in skipped.items():
-				lines.append(f"<li><b>{f}</b>: {v}</li>")
-			lines.append("</ul>")
-			frappe.get_doc({
-				"doctype": "Comment",
-				"comment_type": "Info",
-				"reference_doctype": "Lead",
-				"reference_name": lead_name,
-				"content": "".join(lines),
-			}).insert(ignore_permissions=True)
-			frappe.db.commit()
+			try:
+				lines = ["<b>NextIQ: the following address fields were skipped (invalid values):</b><ul>"]
+				for f, v in skipped.items():
+					lines.append(f"<li><b>{f}</b>: {v}</li>")
+				lines.append("</ul>")
+				frappe.get_doc({
+					"doctype": "Comment",
+					"comment_type": "Info",
+					"reference_doctype": "Lead",
+					"reference_name": lead_name,
+					"content": "".join(lines),
+				}).insert(ignore_permissions=True)
+				frappe.db.commit()
+			except Exception:
+				frappe.log_error(frappe.get_traceback(), f"NextIQ: Failed to post skipped-fields comment for Lead {lead_name}")
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), f"NextIQ: Address creation failed for Lead {lead_name}")
@@ -386,17 +389,27 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 
 	if success:
 		lead_name = None
-		address_data = {}
+		address_data = []   # list of (address_type, fields_dict)
 		original_data = dict(data) if data and isinstance(data, dict) else {}
 		if data and isinstance(data, dict):
-			# Pull the nested address block out first — service sends it as {"address": {...}}
+			# Pull the nested address block out first — service sends it as {"address": [...]}
+			# Each item is {"address_type": "Office"/"Other", ...address fields...}
 			raw_address = data.pop("address", None)
 			if isinstance(raw_address, dict):
-				address_data = {
-					k: str(v)[:_MAX_FIELD_LEN]
-					for k, v in raw_address.items()
-					if k in _ADDRESS_FIELDS and v not in (None, "")
-				}
+				# Backward-compat: single address object (pre-LEP_V.0.0.4)
+				raw_address = [raw_address]
+			if isinstance(raw_address, list):
+				for idx, addr_item in enumerate(raw_address):
+					if not isinstance(addr_item, dict):
+						continue
+					addr_type = addr_item.get("address_type", "Office" if idx == 0 else "Other")
+					addr_fields = {
+						k: str(v)[:_MAX_FIELD_LEN]
+						for k, v in addr_item.items()
+						if k in _ADDRESS_FIELDS and v not in (None, "")
+					}
+					if addr_fields:
+						address_data.append((addr_type, addr_fields))
 			# Validate and truncate remaining flat lead fields
 			data = {
 				k: str(v)[:_MAX_FIELD_LEN]
@@ -451,7 +464,8 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 
 
 				if lead_name and address_data:
-					_create_lead_address(lead_name, address_data)
+					for addr_type, addr_fields in address_data:
+						_create_lead_address(lead_name, addr_fields, addr_type)
 
 				_append_scan_note(lead_name, log_name, scanned_by)
 
