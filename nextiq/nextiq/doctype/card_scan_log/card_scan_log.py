@@ -8,7 +8,7 @@ from frappe.model.document import Document
 # Any attempt to change them through a normal form save is rejected.
 _SERVICE_FIELDS = (
 	"status", "submitted_at", "processed_at", "merged_image",
-	"lead", "scans_remaining", "error_message", "ai_response",
+	"lead", "crm_lead", "scans_remaining", "error_message", "ai_response",
 	"job_id", "cb_secret",
 )
 
