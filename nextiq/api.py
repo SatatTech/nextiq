@@ -608,11 +608,12 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 		success_fields = {
 			"status": "Success",
 			"lead": lead_name,
-			"crm_lead": crm_lead_name,
 			"processed_at": frappe.utils.now(),
 			"ai_response": frappe.as_json(original_data or {}),
 			"cb_secret": "",   # single-use — clear after successful callback
 		}
+		if "crm" in frappe.get_installed_apps():
+			success_fields["crm_lead"] = crm_lead_name
 		if scans_remaining is not None:
 			success_fields["scans_remaining"] = scans_remaining
 		frappe.db.set_value("Card Scan Log", log_name, success_fields)

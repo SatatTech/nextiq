@@ -6,11 +6,18 @@ from frappe.model.document import Document
 
 # Fields written only by submit_card_scan() or scan_callback() via db.set_value.
 # Any attempt to change them through a normal form save is rejected.
-_SERVICE_FIELDS = (
+_SERVICE_FIELDS_BASE = (
 	"status", "submitted_at", "processed_at", "merged_image",
-	"lead", "crm_lead", "scans_remaining", "error_message", "ai_response",
+	"lead", "scans_remaining", "error_message", "ai_response",
 	"job_id", "cb_secret",
 )
+
+
+def _service_fields():
+	fields = list(_SERVICE_FIELDS_BASE)
+	if "crm" in frappe.get_installed_apps():
+		fields.append("crm_lead")
+	return fields
 
 
 class CardScanLog(Document):
@@ -22,15 +29,16 @@ class CardScanLog(Document):
 		# that the caller tried to change. This is defense-in-depth — the
 		# read_only JSON flag and the JS client already block form edits;
 		# this catches crafted API calls that bypass those layers.
+		svc = _service_fields()
 		stored = frappe.db.get_value(
 			"Card Scan Log", self.name,
-			list(_SERVICE_FIELDS),
+			svc,
 			as_dict=True,
 		)
 		if not stored:
 			return
 
-		changed = [f for f in _SERVICE_FIELDS if self.get(f) != stored.get(f)]
+		changed = [f for f in svc if self.get(f) != stored.get(f)]
 		if changed:
 			frappe.log_error(
 				f"User '{frappe.session.user}' attempted to modify protected fields "

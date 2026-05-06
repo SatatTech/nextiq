@@ -84,8 +84,8 @@ app_include_js = "/assets/nextiq/js/nextiq.js"
 # Installation
 # ------------
 
-after_install = "nextiq.version_check.check_service_version"
-after_migrate = "nextiq.version_check.check_service_version"
+after_install = "nextiq.setup.after_install"
+after_migrate = "nextiq.setup.after_migrate"
 
 # Uninstallation
 # ------------
@@ -99,7 +99,7 @@ after_migrate = "nextiq.version_check.check_service_version"
 # Name of the app being installed is passed as an argument
 
 # before_app_install = "nextiq.utils.before_app_install"
-# after_app_install = "nextiq.utils.after_app_install"
+after_app_install = "nextiq.setup.after_app_install"
 
 # Integration Cleanup
 # -------------------
@@ -107,7 +107,7 @@ after_migrate = "nextiq.version_check.check_service_version"
 # Name of the app being uninstalled is passed as an argument
 
 # before_app_uninstall = "nextiq.utils.before_app_uninstall"
-# after_app_uninstall = "nextiq.utils.after_app_uninstall"
+after_app_uninstall = "nextiq.setup.after_app_uninstall"
 
 # Desk Notifications
 # ------------------
