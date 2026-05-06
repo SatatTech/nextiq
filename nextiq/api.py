@@ -245,7 +245,6 @@ def _create_erpnext_lead(data, address_data, scanned_by, log_name):
 	for addr_type, addr_fields in (address_data or []):
 		_create_lead_address(lead_name, addr_fields, addr_type)
 
-	_append_scan_note(lead_name, log_name, scanned_by)
 	return lead_name
 
 
@@ -300,7 +299,6 @@ def _create_crm_lead(data, scanned_by, log_name):
 		}).insert(ignore_permissions=True)
 		frappe.db.commit()
 
-	_append_crm_lead_note(lead_name, log_name, scanned_by)
 	return lead_name
 
 
@@ -594,6 +592,14 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 						crm_lead_name = _create_crm_lead(data.copy(), scanned_by, log_name)
 
 				_apply_voice_notes(lead_name, voice_notes, scanned_by)
+
+				# Add raw written note only when AI produced no summary (note already in AI summary otherwise)
+				ai_has_summary = bool((voice_notes or {}).get("summary_note"))
+				if not ai_has_summary:
+					if lead_name:
+						_append_scan_note(lead_name, log_name, scanned_by)
+					if crm_lead_name:
+						_append_crm_lead_note(crm_lead_name, log_name, scanned_by)
 
 			except frappe.exceptions.DuplicateEntryError as e:
 				err_msg = str(e)[:500] or "A lead with this email address already exists."
