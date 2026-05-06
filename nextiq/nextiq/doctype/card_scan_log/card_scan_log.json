@@ -13,6 +13,11 @@
   "processed_at",
   "section_break_notes",
   "notes",
+  "voice_note_section",
+  "voice_audio",
+  "voice_audio_2",
+  "voice_audio_3",
+  "voice_language",
   "section_break_iewb",
   "ai_response",
   "column_break_zpqw",
@@ -58,7 +63,7 @@
    "fieldname": "lead",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Lead Created",
+   "label": "ERPNext Lead",
    "options": "Lead",
    "read_only": 1
   },
@@ -108,6 +113,37 @@
    "description": "Optional note entered by the user at scan time. Added to the Lead's notes on creation."
   },
   {
+   "collapsible": 1,
+   "fieldname": "voice_note_section",
+   "fieldtype": "Section Break",
+   "label": "Voice Note"
+  },
+  {
+   "fieldname": "voice_audio",
+   "fieldtype": "Attach",
+   "label": "Voice Note 1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "voice_audio_2",
+   "fieldtype": "Attach",
+   "label": "Voice Note 2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "voice_audio_3",
+   "fieldtype": "Attach",
+   "label": "Voice Note 3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "voice_language",
+   "fieldtype": "Data",
+   "label": "Language",
+   "read_only": 1,
+   "description": "Language(s) selected by the user for voice transcription."
+  },
+  {
    "fieldname": "column_break_pxss",
    "fieldtype": "Column Break"
   },
@@ -137,7 +173,7 @@
   }
  ],
  "links": [],
- "modified": "2026-05-01 00:00:00.000000",
+ "modified": "2026-05-06 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "NextIQ",
  "name": "Card Scan Log",
