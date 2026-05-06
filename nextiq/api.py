@@ -245,7 +245,6 @@ def _create_erpnext_lead(data, address_data, scanned_by, log_name):
 	for addr_type, addr_fields in (address_data or []):
 		_create_lead_address(lead_name, addr_fields, addr_type)
 
-	_append_scan_note(lead_name, log_name, scanned_by)
 	return lead_name
 
 
@@ -300,7 +299,6 @@ def _create_crm_lead(data, scanned_by, log_name):
 		}).insert(ignore_permissions=True)
 		frappe.db.commit()
 
-	_append_crm_lead_note(lead_name, log_name, scanned_by)
 	return lead_name
 
 
@@ -361,13 +359,14 @@ def _rate_limit(key, max_per_minute):
 # ── Public endpoints (called from card-scan portal JS) ───────────────────────
 
 @frappe.whitelist()
-def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=None):
+def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=None,
+                     voice_clips=None):
 	"""
-	Receive merged business card image from the portal.
-	Generates job_id + cb_secret, saves image, enqueues _fire_scan_to_service.
+	Receive merged business card image + optional voice clips from the portal.
+	voice_clips: JSON array of {base64, mime} objects (up to 3).
 
+	Generates job_id + cb_secret, saves image + audio files, enqueues _fire_scan_to_service.
 	Returns immediately: {"log_name": str}
-	The browser can close after this — Lead is created via background + callback.
 	"""
 	# Block if the installed app is below the service-required minimum version
 	_service_min = frappe.db.get_value(
@@ -380,7 +379,7 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 			title="App Update Required",
 		)
 
-	# Rate limit: 10 scans per minute per user (hash user to keep plaintext out of Redis)
+	# Rate limit: 10 scans per minute per user
 	_user_hash = hashlib.sha256(frappe.session.user.encode()).hexdigest()
 	if not _rate_limit(f"nextiq_scan:{_user_hash}", max_per_minute=10):
 		frappe.throw(
@@ -391,15 +390,23 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	if "," in merged_image_base64:
 		merged_image_base64 = merged_image_base64.split(",")[1]
 
-	# Guard against oversized payloads — business cards don't need more than ~7.5 MB
-	MAX_B64 = 10 * 1024 * 1024  # 10 MB base64 ≈ 7.5 MB raw
+	MAX_B64 = 10 * 1024 * 1024
 	if len(merged_image_base64) > MAX_B64:
 		frappe.throw("Image is too large (max 7.5 MB). Please use a smaller image.", title="Image Too Large")
 
-	# Sanitize notes: strip HTML tags, limit length
 	notes_clean = re.sub(r"<[^>]+>", "", str(notes or "")).strip()[:2000] or None
 
-	# Generate credentials for this scan job
+	# Parse voice clips — browser sends JSON string or list
+	if isinstance(voice_clips, str):
+		try:
+			import json as _json
+			voice_clips = _json.loads(voice_clips)
+		except Exception:
+			voice_clips = []
+	if not isinstance(voice_clips, list):
+		voice_clips = []
+	voice_clips = voice_clips[:3]  # hard cap at 3
+
 	job_id    = secrets.token_urlsafe(32)
 	cb_secret = secrets.token_urlsafe(32)
 
@@ -415,13 +422,12 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	log.insert(ignore_permissions=True)
 	frappe.db.commit()
 
-	# Save the merged image as a private Frappe file
+	# Save merged image
 	try:
-		file_content = base64.b64decode(merged_image_base64)
 		file_doc = frappe.get_doc({
 			"doctype": "File",
 			"file_name": f"card_scan_{log.name}.jpg",
-			"content": file_content,
+			"content": base64.b64decode(merged_image_base64),
 			"is_private": 1,
 			"attached_to_doctype": "Card Scan Log",
 			"attached_to_name": log.name,
@@ -438,10 +444,44 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 		frappe.db.commit()
 		return {"log_name": log.name}
 
-	# Enqueue lightweight job — it fires the request and returns in <1s
+	# Save each voice clip as a private file; store URLs on the log
+	saved_clips = []   # [{url, mime}]
+	for idx, clip in enumerate(voice_clips):
+		if not isinstance(clip, dict) or not clip.get("base64"):
+			continue
+		try:
+			b64 = clip["base64"]
+			if "," in b64:
+				b64 = b64.split(",")[1]
+			mime = (str(clip.get("mime") or "audio/webm"))[:50]
+			ext  = "mp4" if "mp4" in mime else ("ogg" if "ogg" in mime else "webm")
+			audio_doc = frappe.get_doc({
+				"doctype": "File",
+				"file_name": f"voice_{log.name}_{idx + 1}.{ext}",
+				"content": base64.b64decode(b64),
+				"is_private": 1,
+				"attached_to_doctype": "Card Scan Log",
+				"attached_to_name": log.name,
+			})
+			audio_doc.save(ignore_permissions=True)
+			saved_clips.append({"url": audio_doc.file_url, "mime": mime})
+		except Exception:
+			frappe.log_error(frappe.get_traceback(),
+				f"NextIQ: Voice clip {idx+1} save failed for {log.name}")
+
+	# Store clip URLs in voice_audio, voice_audio_2, voice_audio_3
+	if saved_clips:
+		clip_fields = {}
+		field_names = ["voice_audio", "voice_audio_2", "voice_audio_3"]
+		for i, c in enumerate(saved_clips[:3]):
+			clip_fields[field_names[i]] = c["url"]
+		frappe.db.set_value("Card Scan Log", log.name, clip_fields)
+		frappe.db.commit()
+
 	frappe.enqueue(
 		"nextiq.api._fire_scan_to_service",
 		log_name=log.name,
+		saved_clips=saved_clips,
 		queue="long",
 		timeout=60,
 		now=False,
@@ -452,7 +492,8 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 
 @frappe.whitelist(allow_guest=True)
 def scan_callback(job_id, cb_secret, success, data=None, error=None,
-                  message=None, scans_used=None, scans_allowed=None, scans_remaining=None):
+                  message=None, scans_used=None, scans_allowed=None, scans_remaining=None,
+                  voice_notes=None):
 	"""
 	Called by nextiq_service when scan processing is complete.
 
@@ -550,6 +591,16 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 					else:
 						crm_lead_name = _create_crm_lead(data.copy(), scanned_by, log_name)
 
+				_apply_voice_notes(lead_name, voice_notes, scanned_by)
+
+				# Add raw written note only when AI produced no summary (note already in AI summary otherwise)
+				ai_has_summary = bool((voice_notes or {}).get("summary_note"))
+				if not ai_has_summary:
+					if lead_name:
+						_append_scan_note(lead_name, log_name, scanned_by)
+					if crm_lead_name:
+						_append_crm_lead_note(crm_lead_name, log_name, scanned_by)
+
 			except frappe.exceptions.DuplicateEntryError as e:
 				err_msg = str(e)[:500] or "A lead with this email address already exists."
 				frappe.db.rollback()
@@ -568,7 +619,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				frappe.db.set_value("Card Scan Log", log_name, {
 					"status": "Invalid Data",
 					"error_message": err_msg,
-					"ai_response": frappe.as_json(data or {}),
+					"ai_response": frappe.as_json({"lead": original_data or {}, "voice_notes": voice_notes or {}}),
 					"processed_at": frappe.utils.now(),
 					"cb_secret": "",
 				})
@@ -609,7 +660,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			"status": "Success",
 			"lead": lead_name,
 			"processed_at": frappe.utils.now(),
-			"ai_response": frappe.as_json(original_data or {}),
+			"ai_response": frappe.as_json({"lead": original_data or {}, "voice_notes": voice_notes or {}}),
 			"cb_secret": "",   # single-use — clear after successful callback
 		}
 		if "crm" in frappe.get_installed_apps():
@@ -648,14 +699,10 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 
 # ── Background job ────────────────────────────────────────────────────────────
 
-def _fire_scan_to_service(log_name):
+def _fire_scan_to_service(log_name, saved_clips=None):
 	"""
-	Lightweight RQ job: load image, fire request to nextiq_service, return in <1s.
-
-	nextiq_service enqueues its own background job, returns immediately with
-	{"queued": true, "job_id": "..."}.
-
-	The actual result arrives later via the scan_callback endpoint.
+	Lightweight RQ job: load image + voice clips, fire to nextiq_service.
+	saved_clips: list of {url, mime} dicts saved by submit_card_scan.
 	"""
 	logger = frappe.logger("nextiq")
 	logger.info(f"[NextIQ] Firing scan to service: {log_name}")
@@ -680,29 +727,41 @@ def _fire_scan_to_service(log_name):
 		file_doc     = frappe.get_doc("File", {"file_url": log.merged_image})
 		image_base64 = base64.b64encode(file_doc.get_content()).decode()
 
-		# Build callback URL pointing back to this site
-		callback_url = (
-			frappe.utils.get_url()
-			+ "/api/method/nextiq.api.scan_callback"
-		)
+		# Load voice clips from saved file URLs
+		voice_clips_payload = []
+		for clip_info in (saved_clips or []):
+			if not isinstance(clip_info, dict) or not clip_info.get("url"):
+				continue
+			try:
+				af = frappe.get_doc("File", {"file_url": clip_info["url"]})
+				voice_clips_payload.append({
+					"base64": base64.b64encode(af.get_content()).decode(),
+					"mime":   clip_info.get("mime", "audio/webm"),
+				})
+			except Exception:
+				frappe.log_error(frappe.get_traceback(),
+					f"NextIQ: Voice clip load failed for {log_name} — skipping")
 
+		callback_url = frappe.utils.get_url() + "/api/method/nextiq.api.scan_callback"
 		logger.info(f"[NextIQ] Calling service at {SERVICE_URL}, job_id={log.job_id}")
+
+		payload = {
+			"image_base64":    image_base64,
+			"filename":        log.merged_image.split("/")[-1] if log.merged_image else "business_card.jpg",
+			"job_id":          log.job_id,
+			"callback_url":    callback_url,
+			"cb_secret":       log.cb_secret,
+			"customer_log_id": log.name,
+			"notes":           log.notes or "",
+			"scanned_by":      log.scanned_by,
+		}
+		if voice_clips_payload:
+			payload["voice_clips"] = voice_clips_payload
 
 		try:
 			response = requests.post(
 				f"{SERVICE_URL}/api/method/nextiq_service.api.process_scan",
-				json={
-					# api_key is sent in the Authorization header, not the body,
-					# so it never appears in Frappe's form_dict or debug logs.
-					"image_base64":    image_base64,
-					"filename":        log.merged_image.split("/")[-1] if log.merged_image else "business_card.jpg",
-					"job_id":          log.job_id,
-					"callback_url":    callback_url,
-					"cb_secret":       log.cb_secret,
-					"customer_log_id": log.name,
-					"notes":           log.notes or "",
-					"scanned_by":      log.scanned_by,
-				},
+				json=payload,
 				headers={
 					"Content-Type": "application/json",
 					"X-NextIQ-API-Key": api_key,
@@ -818,6 +877,102 @@ def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
 		frappe.log_error(
 			frappe.get_traceback(),
 			f"NextIQ: Note append failed for CRM Lead {crm_lead_name}",
+		)
+
+
+# ── Voice notes helper ───────────────────────────────────────────────────────
+
+def _apply_voice_notes(lead_name, voice_notes, scanned_by):
+	"""
+	Create ERPNext summary note, ToDo tasks, and Events from AI-extracted voice note data.
+	Fails silently — voice note errors must never block the lead creation flow.
+	"""
+	if not lead_name or not voice_notes or not isinstance(voice_notes, dict):
+		return
+
+	summary_note = voice_notes.get("summary_note") or ""
+	tasks        = voice_notes.get("tasks") or []
+	events       = voice_notes.get("events") or []
+
+	if not summary_note and not tasks and not events:
+		return
+
+	try:
+		# ── Summary note (bilingual transcript + structured breakdown) ──────────
+		if summary_note.strip():
+			lead_doc = frappe.get_doc("Lead", lead_name)
+			lead_doc.append("notes", {
+				"note":     summary_note,
+				"added_by": scanned_by or frappe.session.user,
+				"added_on": frappe.utils.now_datetime(),
+			})
+			lead_doc.save(ignore_permissions=True)
+			frappe.db.commit()
+
+		# ── Tasks (ToDo) ────────────────────────────────────────────────────────
+		for task in tasks:
+			if not isinstance(task, dict) or not task.get("description"):
+				continue
+			desc_en     = str(task.get("description", ""))
+			desc_native = str(task.get("description_native") or desc_en)
+			if desc_native and desc_native != desc_en:
+				task_html = desc_en + "<p><em>(" + desc_native.replace("<p>", "").replace("</p>", "") + ")</em></p>"
+			else:
+				task_html = desc_en
+			frappe.get_doc({
+				"doctype":        "ToDo",
+				"status":         "Open",
+				"priority":       "Medium",
+				"description":    task_html[:2000],
+				"date":           (task.get("date") or frappe.utils.today())[:10],
+				"reference_type": "Lead",
+				"reference_name": lead_name,
+				"allocated_to":   scanned_by or frappe.session.user,
+			}).insert(ignore_permissions=True)
+		if tasks:
+			frappe.db.commit()
+
+		# ── Events ─────────────────────────────────────────────────────────────
+		_VALID_CATEGORIES = {"Event", "Meeting", "Call", "Sent/Received Email", "Other"}
+		for event in events:
+			if not isinstance(event, dict) or not event.get("subject"):
+				continue
+			category = event.get("event_category", "Meeting")
+			if category not in _VALID_CATEGORIES:
+				category = "Other"
+			starts_on      = event.get("starts_on") or str(frappe.utils.today())
+			subject_en     = str(event.get("subject", ""))[:80]
+			subject_native = str(event.get("subject_native") or subject_en)[:80]
+			if subject_native and subject_native != subject_en:
+				full_subject = f"{subject_en} ({subject_native})"[:100]
+			else:
+				full_subject = subject_en
+			desc_en     = str(event.get("description", ""))
+			desc_native = str(event.get("description_native") or desc_en)
+			if desc_native and desc_native != desc_en:
+				event_desc = desc_en + "<p><em>(" + desc_native.replace("<p>", "").replace("</p>", "") + ")</em></p>"
+			else:
+				event_desc = desc_en
+			frappe.get_doc({
+				"doctype":           "Event",
+				"subject":           full_subject,
+				"event_category":    category,
+				"starts_on":         starts_on,
+				"description":       event_desc[:2000],
+				"status":            "Open",
+				"event_type":        "Private",
+				"event_participants": [{
+					"reference_doctype": "Lead",
+					"reference_docname": lead_name,
+				}],
+			}).insert(ignore_permissions=True)
+		if events:
+			frappe.db.commit()
+
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"NextIQ: Voice notes apply failed for Lead {lead_name}",
 		)
 
 
