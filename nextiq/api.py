@@ -263,41 +263,48 @@ def _create_crm_lead(data, scanned_by, log_name):
 	skipped_fields = {}
 	lead_name = None
 
-	for _attempt in range(len(crm_data) + 1):
-		try:
-			doc = {"doctype": "CRM Lead", **crm_data}
-			if scanned_by and scanned_by != "Guest":
-				doc["lead_owner"] = scanned_by
-			lead = frappe.get_doc(doc)
-			lead.insert(ignore_permissions=True)
-			frappe.db.commit()
-			lead_name = lead.name
-			break
-		except frappe.exceptions.DuplicateEntryError:
-			raise
-		except frappe.ValidationError as e:
-			frappe.db.rollback()
-			bad_field = _find_bad_field(str(e), crm_data)
-			if bad_field:
-				skipped_fields[bad_field] = crm_data.pop(bad_field)
-			else:
-				raise
-	else:
-		raise frappe.ValidationError("All CRM Lead fields were invalid; no CRM Lead could be created.")
+	_orig_user = frappe.session.user
+	try:
+		# Run as scanned_by: fixes CRM Lead assign_to() permission check in after_insert
+		frappe.set_user(scanned_by or "Administrator")
 
-	if skipped_fields:
-		lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
-		for f, v in skipped_fields.items():
-			lines.append(f"<li><b>{f}</b>: {v}</li>")
-		lines.append("</ul>")
-		frappe.get_doc({
-			"doctype": "Comment",
-			"comment_type": "Info",
-			"reference_doctype": "CRM Lead",
-			"reference_name": lead_name,
-			"content": "".join(lines),
-		}).insert(ignore_permissions=True)
-		frappe.db.commit()
+		for _attempt in range(len(crm_data) + 1):
+			try:
+				doc = {"doctype": "CRM Lead", **crm_data}
+				if scanned_by and scanned_by != "Guest":
+					doc["lead_owner"] = scanned_by
+				lead = frappe.get_doc(doc)
+				lead.insert(ignore_permissions=True)
+				frappe.db.commit()
+				lead_name = lead.name
+				break
+			except frappe.exceptions.DuplicateEntryError:
+				raise
+			except frappe.ValidationError as e:
+				frappe.db.rollback()
+				bad_field = _find_bad_field(str(e), crm_data)
+				if bad_field:
+					skipped_fields[bad_field] = crm_data.pop(bad_field)
+				else:
+					raise
+		else:
+			raise frappe.ValidationError("All CRM Lead fields were invalid; no CRM Lead could be created.")
+
+		if skipped_fields:
+			lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
+			for f, v in skipped_fields.items():
+				lines.append(f"<li><b>{f}</b>: {v}</li>")
+			lines.append("</ul>")
+			frappe.get_doc({
+				"doctype": "Comment",
+				"comment_type": "Info",
+				"reference_doctype": "CRM Lead",
+				"reference_name": lead_name,
+				"content": "".join(lines),
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
+	finally:
+		frappe.set_user(_orig_user)
 
 	return lead_name
 
@@ -761,6 +768,7 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 			"customer_log_id": log.name,
 			"notes":           log.notes or "",
 			"scanned_by":      log.scanned_by,
+			"today":           frappe.utils.today(),
 		}
 		if voice_clips_payload:
 			payload["voice_clips"] = voice_clips_payload
