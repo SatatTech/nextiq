@@ -205,45 +205,51 @@ def _create_erpnext_lead(data, address_data, scanned_by, log_name):
 	skipped_fields = {}
 	lead_name = None
 
-	for _attempt in range(len(data) + 1):
-		try:
-			lead_doc_data = {"doctype": "Lead", **data}
-			if scanned_by and scanned_by != "Guest":
-				lead_doc_data["lead_owner"] = scanned_by
-			lead = frappe.get_doc(lead_doc_data)
-			lead.insert(ignore_permissions=True)
-			frappe.db.commit()
-			lead_name = lead.name
-			break
-		except frappe.exceptions.DuplicateEntryError:
-			raise
-		except frappe.ValidationError as e:
-			frappe.db.rollback()
-			bad_field = _find_bad_field(str(e), data)
-			if bad_field:
-				skipped_fields[bad_field] = data.pop(bad_field)
-			else:
+	_orig_user = frappe.session.user
+	try:
+		frappe.set_user(scanned_by or "Administrator")
+
+		for _attempt in range(len(data) + 1):
+			try:
+				lead_doc_data = {"doctype": "Lead", **data}
+				if scanned_by and scanned_by != "Guest":
+					lead_doc_data["lead_owner"] = scanned_by
+				lead = frappe.get_doc(lead_doc_data)
+				lead.insert(ignore_permissions=True)
+				frappe.db.commit()
+				lead_name = lead.name
+				break
+			except frappe.exceptions.DuplicateEntryError:
 				raise
-	else:
-		raise frappe.ValidationError("All fields were invalid; no lead could be created.")
+			except frappe.ValidationError as e:
+				frappe.db.rollback()
+				bad_field = _find_bad_field(str(e), data)
+				if bad_field:
+					skipped_fields[bad_field] = data.pop(bad_field)
+				else:
+					raise
+		else:
+			raise frappe.ValidationError("All fields were invalid; no lead could be created.")
 
-	if skipped_fields:
-		frappe.db.set_value("Lead", lead_name, {f: None for f in skipped_fields})
-		lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
-		for f, v in skipped_fields.items():
-			lines.append(f"<li><b>{f}</b>: {v}</li>")
-		lines.append("</ul>")
-		frappe.get_doc({
-			"doctype": "Comment",
-			"comment_type": "Info",
-			"reference_doctype": "Lead",
-			"reference_name": lead_name,
-			"content": "".join(lines),
-		}).insert(ignore_permissions=True)
-		frappe.db.commit()
+		if skipped_fields:
+			frappe.db.set_value("Lead", lead_name, {f: None for f in skipped_fields})
+			lines = ["<b>NextIQ: the following fields were skipped (invalid values):</b><ul>"]
+			for f, v in skipped_fields.items():
+				lines.append(f"<li><b>{f}</b>: {v}</li>")
+			lines.append("</ul>")
+			frappe.get_doc({
+				"doctype": "Comment",
+				"comment_type": "Info",
+				"reference_doctype": "Lead",
+				"reference_name": lead_name,
+				"content": "".join(lines),
+			}).insert(ignore_permissions=True)
+			frappe.db.commit()
 
-	for addr_type, addr_fields in (address_data or []):
-		_create_lead_address(lead_name, addr_fields, addr_type)
+		for addr_type, addr_fields in (address_data or []):
+			_create_lead_address(lead_name, addr_fields, addr_type)
+	finally:
+		frappe.set_user(_orig_user)
 
 	return lead_name
 
