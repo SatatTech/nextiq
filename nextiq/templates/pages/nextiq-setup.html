@@ -1,0 +1,248 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Connect NextIQ{% endblock %}
+
+{% block head_include %}
+{{ include_style('login.bundle.css') }}
+<style>
+  .web-footer, nav.navbar { display: none !important; }
+  .page-content-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .page-content-wrapper > .container { width: 100%; }
+
+  /* Step visibility */
+  .niq-step { display: none; }
+  .niq-step.active { display: block; }
+
+  /* Progress dots */
+  .niq-dots { display: flex; gap: 6px; justify-content: center; margin: 0 0 20px; }
+  .niq-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gray-300, #d1d5db); transition: all 0.2s; }
+  .niq-dot.active { background: var(--gray-900, #111827); width: 18px; border-radius: 4px; }
+
+  /* Spinner */
+  .niq-spinner { text-align: center; padding: 32px 0 16px; }
+  .niq-spinner-ring {
+    display: inline-block; width: 32px; height: 32px;
+    border: 3px solid var(--gray-200, #e5e7eb);
+    border-top-color: var(--gray-900, #111827);
+    border-radius: 50%;
+    animation: niq-spin 0.8s linear infinite;
+    margin-bottom: 10px;
+  }
+  @keyframes niq-spin { to { transform: rotate(360deg); } }
+
+  /* Icons */
+  .niq-icon { text-align: center; font-size: 36px; margin: 4px 0; }
+
+  /* Inline alert */
+  .niq-alert {
+    background: var(--red-50, #fef2f2);
+    border: 1px solid var(--red-200, #fecaca);
+    border-radius: var(--border-radius-sm, 6px);
+    padding: 10px 14px;
+    color: var(--red-700, #b91c1c);
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  .niq-optional { color: var(--gray-500, #9ca3af); font-weight: 400; }
+
+  /* Back button */
+  .niq-back {
+    display: block; width: 100%; text-align: center;
+    margin-top: 10px; padding: 6px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted, #6b7280); font-size: 13px;
+    border-radius: var(--border-radius-sm, 6px);
+  }
+  .niq-back:hover { background: var(--gray-100, #f3f4f6); }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="for-login">
+  <div class="page-card-head">
+    <span style="font-size:24px;font-weight:700;letter-spacing:-0.5px;color:var(--gray-900,#111827)">
+      Next<span style="color:#4f46e5">IQ</span>
+    </span>
+  </div>
+
+  <div class="login-content page-card">
+    <form onsubmit="return false">
+
+      <!-- Step 1: Welcome -->
+      <div class="niq-step active" id="niq-step-1">
+        <h5 class="text-center" style="margin:0 0 6px">Connect to NextIQ</h5>
+        <p class="text-center text-muted" style="font-size:13px;line-height:1.6;margin-bottom:24px">
+          Let&rsquo;s connect your site to the NextIQ scanning service.<br>
+          This takes less than a minute and happens automatically.
+        </p>
+        <div class="page-card-actions">
+          <button class="btn btn-sm btn-primary btn-block" onclick="niqGoStep(2)">
+            Get Started &rarr;
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Details -->
+      <div class="niq-step" id="niq-step-2">
+        <h5 style="margin:0 0 4px">Your Details</h5>
+        <p class="text-muted" style="font-size:13px;margin-bottom:16px">Used to create your NextIQ account.</p>
+        <div class="niq-dots">
+          <div class="niq-dot active"></div>
+          <div class="niq-dot"></div>
+        </div>
+        <div class="page-card-body">
+          <div class="niq-alert" id="niq-error"></div>
+          <div class="form-group">
+            <label class="form-label" for="niq-email">Email Address</label>
+            <input type="email" id="niq-email" class="form-control"
+                   value="" placeholder="you@company.com" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="niq-company">
+              Company Name <span class="niq-optional">(optional)</span>
+            </label>
+            <input type="text" id="niq-company" class="form-control" placeholder="Your Company" />
+          </div>
+        </div>
+        <div class="page-card-actions">
+          <button class="btn btn-sm btn-primary btn-block" id="niq-connect-btn" onclick="niqConnect()">
+            Connect to NextIQ &rarr;
+          </button>
+          <button type="button" class="niq-back" onclick="niqGoStep(1)">&larr; Back</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Connecting -->
+      <div class="niq-step" id="niq-step-3">
+        <div class="niq-spinner">
+          <div class="niq-spinner-ring"></div>
+          <div class="niq-dots" style="margin-top:12px">
+            <div class="niq-dot active"></div>
+            <div class="niq-dot active"></div>
+          </div>
+          <p class="text-muted" style="font-size:13px;margin-top:8px" id="niq-progress-msg">
+            Verifying your site&hellip;
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 4: Success -->
+      <div class="niq-step" id="niq-step-4">
+        <div class="niq-icon">&#10003;</div>
+        <h5 class="text-center" style="margin:8px 0 4px">You&rsquo;re connected!</h5>
+        <p class="text-center text-muted" style="font-size:13px;margin-bottom:20px">
+          Signed in as <strong id="niq-success-email"></strong><br>
+          You have <strong>10 free scans</strong> to get started.
+        </p>
+        <div class="page-card-actions">
+          <button class="btn btn-sm btn-primary btn-block" onclick="window.location='/app'">
+            Go to Desk &rarr;
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 5: Error -->
+      <div class="niq-step" id="niq-step-5">
+        <div class="niq-icon" style="color:var(--red-500,#ef4444)">&#10007;</div>
+        <h5 class="text-center" style="margin:8px 0 4px">Connection Failed</h5>
+        <p class="text-center text-muted" style="font-size:13px;margin-bottom:20px" id="niq-final-error">
+          Something went wrong. Please try again.
+        </p>
+        <div class="page-card-actions">
+          <button class="btn btn-sm btn-primary btn-block" onclick="niqGoStep(2)">
+            Try Again
+          </button>
+        </div>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<script>
+function niqGoStep(n) {
+  document.querySelectorAll(".niq-step").forEach(el => el.classList.remove("active"));
+  document.getElementById("niq-step-" + n).classList.add("active");
+}
+
+function niqShowError(msg) {
+  const box = document.getElementById("niq-error");
+  box.textContent = msg;
+  box.style.display = "block";
+}
+
+function niqHideError() {
+  document.getElementById("niq-error").style.display = "none";
+}
+
+const _ERROR_MESSAGES = {
+  "rate_limited":             "Too many attempts. Please try again in an hour.",
+  "already_registered":       "This email is already registered with NextIQ. Please contact support.",
+  "site_already_registered":  "This site is already connected to NextIQ.",
+  "site_verification_failed": "Could not verify your site. Please check your connection and try again.",
+  "challenge_failed":         "Site verification failed. Please try again.",
+  "machine_limit_reached":    "Maximum 2 sites per server are allowed. Please contact support.",
+  "invalid_site_url":         "Your site URL could not be verified. Please contact support.",
+  "missing_fields":           "Please fill in all required fields.",
+  "registration_in_progress": "Registration already in progress. Please wait and try again.",
+  "internal_error":           "An unexpected error occurred. Please try again.",
+};
+
+// Autofill logged-in user email
+document.addEventListener("DOMContentLoaded", function () {
+  try {
+    const user = frappe.session && frappe.session.user;
+    if (user && user !== "Guest") {
+      document.getElementById("niq-email").value = user;
+    }
+  } catch (e) {}
+});
+
+async function niqConnect() {
+  const email   = (document.getElementById("niq-email").value   || "").trim();
+  const company = (document.getElementById("niq-company").value || "").trim();
+
+  niqHideError();
+
+  if (!email) {
+    niqShowError("Please enter your email address.");
+    return;
+  }
+
+  niqGoStep(3);
+
+  try {
+    const resp = await frappe.call({
+      method: "nextiq.api.complete_registration_wizard",
+      args:   { email, company },
+      freeze: false,
+    });
+
+    const result = resp.message || {};
+
+    if (result.success) {
+      document.getElementById("niq-success-email").textContent = result.email || email;
+      niqGoStep(4);
+    } else {
+      const errCode = result.error || "internal_error";
+      const msg     = result.message || _ERROR_MESSAGES[errCode] || "Registration failed. Please try again.";
+      document.getElementById("niq-final-error").textContent = msg;
+      niqGoStep(5);
+    }
+
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : "Connection failed. Please try again.";
+    document.getElementById("niq-final-error").textContent = msg;
+    niqGoStep(5);
+  }
+}
+</script>
+{% endblock %}

@@ -1316,3 +1316,130 @@ def get_live_balance():
 					 title="Service Error")
 
 	return resp.json().get("message", {})
+
+
+# ── Self-onboarding registration ──────────────────────────────────────────────
+
+def _get_site_fingerprint():
+	"""SHA-256 of encryption_key + db_name + Administrator creation date."""
+	parts = [
+		frappe.conf.get("encryption_key", ""),
+		frappe.conf.get("db_name", ""),
+		str(frappe.db.get_value("User", "Administrator", "creation") or ""),
+	]
+	return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
+
+def _get_machine_fingerprint():
+	"""SHA-256 of /etc/machine-id (Linux). Returns empty string if unavailable."""
+	try:
+		with open("/etc/machine-id") as f:
+			machine_id = f.read().strip()
+		if machine_id:
+			return hashlib.sha256(machine_id.encode()).hexdigest()
+	except Exception:
+		pass
+	return ""
+
+
+@frappe.whitelist(allow_guest=True)
+def get_registration_proof(session_id=None):
+	"""
+	Called back by nextiq.service during self-onboarding verification.
+	Returns challenge + fingerprints only if session_id matches the stored value.
+	This prevents an attacker who reads the challenge from using it without
+	knowing the session_id (which was only exchanged server-to-server).
+	"""
+	if not session_id:
+		return None
+
+	stored_session   = frappe.db.get_single_value("NextIQ Settings", "reg_session_id")
+	stored_challenge = frappe.db.get_single_value("NextIQ Settings", "reg_challenge")
+
+	if not stored_session or session_id != stored_session:
+		return None
+
+	return {
+		"challenge":           stored_challenge,
+		"session_id":          session_id,
+		"site_fingerprint":    _get_site_fingerprint(),
+		"machine_fingerprint": _get_machine_fingerprint(),
+	}
+
+
+@frappe.whitelist()
+def complete_registration_wizard(email, company=None):
+	"""
+	Called from the setup wizard JS (logged-in System Manager only).
+	Orchestrates the full two-step registration with nextiq.service:
+	  1. Fetch challenge + session_id from nextiq.service
+	  2. Store temporarily in NextIQ Settings (so the callback can read them)
+	  3. Call complete_registration on nextiq.service
+	  4. Save API key, mark setup_complete = 1
+	"""
+	email   = (email   or "").strip().lower()
+	company = (company or "").strip()
+
+	if not email:
+		frappe.throw("Email is required.")
+
+	site_url = frappe.utils.get_url().rstrip("/")
+
+	# Step 1: get challenge + session_id
+	try:
+		ch_resp = requests.get(
+			f"{SERVICE_URL}/api/method/nextiq_service.api.get_registration_challenge",
+			timeout=10,
+		)
+		ch_resp.raise_for_status()
+		ch_data = ch_resp.json().get("message", {})
+	except Exception:
+		frappe.log_error("NextIQ: get_registration_challenge failed", frappe.get_traceback())
+		frappe.throw("Could not reach NextIQ Service. Please try again.")
+
+	if not ch_data.get("success"):
+		frappe.throw(ch_data.get("message") or "Could not start registration. Please try again.")
+
+	challenge  = ch_data["challenge"]
+	session_id = ch_data["session_id"]
+
+	# Step 2: store challenge + session_id so the callback can read them
+	frappe.db.set_single_value("NextIQ Settings", "reg_challenge",  challenge)
+	frappe.db.set_single_value("NextIQ Settings", "reg_session_id", session_id)
+	frappe.db.commit()
+
+	# Step 3: call complete_registration — nextiq.service will call back to get proof
+	try:
+		reg_resp = requests.post(
+			f"{SERVICE_URL}/api/method/nextiq_service.api.complete_registration",
+			json={
+				"site_url":   site_url,
+				"email":      email,
+				"company":    company,
+				"session_id": session_id,
+			},
+			timeout=20,
+		)
+		reg_resp.raise_for_status()
+		result = reg_resp.json().get("message", {})
+	except Exception:
+		frappe.log_error("NextIQ: complete_registration call failed", frappe.get_traceback())
+		frappe.throw("Registration request failed. Please try again.")
+	finally:
+		# Always clear temporary fields
+		frappe.db.set_single_value("NextIQ Settings", "reg_challenge",  "")
+		frappe.db.set_single_value("NextIQ Settings", "reg_session_id", "")
+		frappe.db.commit()
+
+	if not result.get("success"):
+		frappe.throw(result.get("message") or "Registration failed. Please try again.")
+
+	# Step 4: save API key and mark setup complete
+	settings = frappe.get_single("NextIQ Settings")
+	settings.api_key         = result["api_key"]
+	settings.registered_email = result["email"]
+	settings.setup_complete  = 1
+	settings.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {"success": True, "email": result["email"]}
