@@ -39,15 +39,17 @@ def execute(filters=None):
 		for r in rows
 	]
 
-	chart = {
-		"type": _CHART_TYPE.get(period, "bar"),
-		"data": {
-			"labels":   [r.period_label for r in rows],
-			"datasets": [{"name": "Time Saved (mins)", "values": [r.minutes_saved for r in rows]}],
-		},
-		"colors": ["#2ecc71"],
-		"axisOptions": {"xIsSeries": 1},
-	}
+	chart = None
+	if rows:
+		chart = {
+			"type": _CHART_TYPE.get(period, "bar"),
+			"data": {
+				"labels":   [r.period_label for r in rows],
+				"datasets": [{"name": "Time Saved (mins)", "values": [r.minutes_saved for r in rows]}],
+			},
+			"colors": ["#2ecc71"],
+			"axisOptions": {"xIsSeries": 1},
+		}
 
 	return columns, data, None, chart
 
