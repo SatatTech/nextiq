@@ -109,7 +109,7 @@
             <label class="form-label" for="niq-company">
               Company Name <span class="niq-optional">(optional)</span>
             </label>
-            <input type="text" id="niq-company" class="form-control" placeholder="Your Company" />
+            <input type="text" id="niq-company" class="form-control" placeholder="Your Company" maxlength="140" />
           </div>
         </div>
         <div class="page-card-actions">
@@ -140,7 +140,7 @@
         <h5 class="text-center" style="margin:8px 0 4px">You&rsquo;re connected!</h5>
         <p class="text-center text-muted" style="font-size:13px;margin-bottom:20px">
           Signed in as <strong id="niq-success-email"></strong><br>
-          You have <strong>10 free scans</strong> to get started.
+          Your free trial scans are ready to use.
         </p>
         <div class="page-card-actions">
           <button class="btn btn-sm btn-primary btn-block" onclick="window.location='/app'">
@@ -184,6 +184,7 @@ function niqHideError() {
 }
 
 const _ERROR_MESSAGES = {
+  "account_suspended":        "Your account has been suspended. Please contact support.",
   "rate_limited":             "Too many attempts. Please try again in an hour.",
   "already_registered":       "This email is already registered with NextIQ. Please contact support.",
   "site_already_registered":  "This site is already connected to NextIQ.",
@@ -230,6 +231,7 @@ async function niqConnect() {
 
     if (result.success) {
       document.getElementById("niq-success-email").textContent = result.email || email;
+      frappe.boot.nextiq_setup_needed = false;
       niqGoStep(4);
     } else {
       const errCode = result.error || "internal_error";
