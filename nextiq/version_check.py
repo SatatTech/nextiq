@@ -42,8 +42,8 @@ def check_service_version():
 		data = response.json().get("message", {})
 		if not data.get("success"):
 			frappe.log_error(
-				f"get_service_info returned: {data}",
 				"NextIQ: version check failed",
+				f"get_service_info returned: {data}",
 			)
 			return
 
@@ -72,4 +72,4 @@ def check_service_version():
 	except requests.exceptions.ConnectionError:
 		frappe.logger("nextiq").warning("NextIQ: version check skipped — service unreachable")
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), "NextIQ: check_service_version failed")
+		frappe.log_error("NextIQ: check_service_version failed", frappe.get_traceback())
