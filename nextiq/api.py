@@ -1450,12 +1450,11 @@ def complete_registration_wizard(email, company=None):
 
 	# Step 4: save API key and mark setup complete
 	try:
-		from frappe.utils.password import set_encrypted_password
 		frappe.db.set_single_value("NextIQ Settings", {
 			"registered_email": result.get("email") or email,
 			"setup_complete":   1,
 		})
-		set_encrypted_password("NextIQ Settings", "NextIQ Settings", result["api_key"], fieldname="api_key")
+		frappe.db.set_value("NextIQ Settings", "NextIQ Settings", "api_key", result["api_key"])
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error("NextIQ: settings save failed", frappe.get_traceback())
