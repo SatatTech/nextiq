@@ -23,11 +23,10 @@ def check_service_version():
 	in NextIQ Settings for the boot session to read.
 	"""
 	try:
-		settings = frappe.get_single("NextIQ Settings")
-		if not settings.api_key:
-			return
-
+		settings = frappe.get_doc("NextIQ Settings")
 		api_key = settings.get_password("api_key")
+		if not api_key:
+			return
 
 		response = requests.get(
 			f"{SERVICE_URL}/api/method/nextiq_service.api.get_service_info",
@@ -39,7 +38,7 @@ def check_service_version():
 		)
 		response.raise_for_status()
 
-		data = response.json().get("message", {})
+		data = response.json().get("message") or {}
 		if not data.get("success"):
 			frappe.log_error(
 				"NextIQ: version check failed",
