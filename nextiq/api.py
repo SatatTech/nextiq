@@ -1433,7 +1433,7 @@ def complete_registration_wizard(email, company=None):
 			timeout=20,
 		)
 		reg_resp.raise_for_status()
-		result = reg_resp.json().get("message", {})
+		result = reg_resp.json().get("message") or {}
 	except Exception:
 		frappe.log_error("NextIQ: complete_registration call failed", frappe.get_traceback())
 		result = {"success": False, "error": "internal_error",
@@ -1450,15 +1450,23 @@ def complete_registration_wizard(email, company=None):
 
 	# Step 4: save API key and mark setup complete
 	try:
-		settings = frappe.get_single("NextIQ Settings")
-		settings.api_key          = result["api_key"]
-		settings.registered_email = result["email"]
-		settings.setup_complete   = 1
-		settings.save(ignore_permissions=True)
+		from frappe.utils.password import set_encrypted_password
+		frappe.db.set_single_value("NextIQ Settings", {
+			"registered_email": result.get("email") or email,
+			"setup_complete":   1,
+		})
+		set_encrypted_password("NextIQ Settings", "NextIQ Settings", result["api_key"], fieldname="api_key")
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error("NextIQ: settings save failed", frappe.get_traceback())
 		return {"success": False, "error": "internal_error",
 		        "message": "Registration succeeded but settings could not be saved. Please contact support."}
 
-	return {"success": True, "email": result["email"]}
+	# Clear all caches so the next boot reads fresh setup_complete = 1 from DB
+	frappe.clear_document_cache("NextIQ Settings", "NextIQ Settings")
+	try:
+		frappe.cache().delete_key("bootinfo")
+	except Exception:
+		pass
+
+	return {"success": True, "email": result.get("email") or email}
