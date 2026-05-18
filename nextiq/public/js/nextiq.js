@@ -37,15 +37,13 @@ nextiq._hide_banner = function () {
 	$("#nextiq-mandatory-update-banner").remove();
 };
 
-// Redirect System Manager to setup wizard if NextIQ is not yet configured
+// Redirect System Manager to setup wizard if NextIQ is not yet configured.
+// Runs on every page-change so stale boot data self-heals on next load.
 $(document).on("page-change", function () {
-	if (!frappe._nextiq_setup_checked) {
-		frappe._nextiq_setup_checked = true;
-		if (frappe.boot.nextiq_setup_needed
-				&& window.location.pathname !== "/nextiq-setup") {
-			window.location.href = "/nextiq-setup";
-			return;
-		}
+	if (frappe.boot.nextiq_setup_needed
+			&& window.location.pathname !== "/nextiq-setup") {
+		window.location.href = "/nextiq-setup";
+		return;
 	}
 
 	if (frappe._nextiq_notifications_shown) return;

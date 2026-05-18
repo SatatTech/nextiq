@@ -171,10 +171,10 @@ def _create_lead_address(lead_name, address_data, address_type="Office"):
 				}).insert(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
-				frappe.log_error(frappe.get_traceback(), f"NextIQ: Failed to post skipped-fields comment for Lead {lead_name}")
+				frappe.log_error(f"NextIQ: Failed to post skipped-fields comment for Lead {lead_name}", frappe.get_traceback())
 
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), f"NextIQ: Address creation failed for Lead {lead_name}")
+		frappe.log_error(f"NextIQ: Address creation failed for Lead {lead_name}", frappe.get_traceback())
 		# Leave a comment on the Lead so the sales rep can add the address manually
 		try:
 			err_str = str(e)
@@ -479,8 +479,8 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 			audio_doc.save(ignore_permissions=True)
 			saved_clips.append({"url": audio_doc.file_url, "mime": mime})
 		except Exception:
-			frappe.log_error(frappe.get_traceback(),
-				f"NextIQ: Voice clip {idx+1} save failed for {log.name}")
+			frappe.log_error(f"NextIQ: Voice clip {idx+1} save failed for {log.name}",
+				frappe.get_traceback())
 
 	# Store clip URLs in voice_audio, voice_audio_2, voice_audio_3
 	if saved_clips:
@@ -536,8 +536,8 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 	stored_secret = frappe.db.get_value("Card Scan Log", log_name, "cb_secret") or ""
 	if not stored_secret or not hmac.compare_digest(stored_secret, str(cb_secret)):
 		frappe.log_error(
-			f"Invalid cb_secret received for job_id={job_id}",
 			"NextIQ: Callback Auth Failed",
+			f"Invalid cb_secret received for job_id={job_id}",
 		)
 		return {"success": False, "error": "invalid_secret"}
 
@@ -598,8 +598,8 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 							crm_lead_name = _create_crm_lead(data.copy(), scanned_by, log_name)
 						except Exception:
 							frappe.log_error(
-								traceback.format_exc(),
 								f"NextIQ: CRM Lead creation failed for {log_name}",
+								traceback.format_exc(),
 							)
 					else:
 						crm_lead_name = _create_crm_lead(data.copy(), scanned_by, log_name)
@@ -655,7 +655,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				)
 				return {"success": False, "error": "invalid_lead_data"}
 			except Exception as e:
-				frappe.log_error(traceback.format_exc(), f"NextIQ: Lead creation failed for {log_name}")
+				frappe.log_error(f"NextIQ: Lead creation failed for {log_name}", traceback.format_exc())
 				err_msg = str(e)[:500] or "Lead could not be created from scan data."
 				frappe.db.rollback()
 				frappe.db.set_value("Card Scan Log", log_name, {
@@ -759,8 +759,8 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 					"mime":   clip_info.get("mime", "audio/webm"),
 				})
 			except Exception:
-				frappe.log_error(frappe.get_traceback(),
-					f"NextIQ: Voice clip load failed for {log_name} — skipping")
+				frappe.log_error(f"NextIQ: Voice clip load failed for {log_name} — skipping",
+					frappe.get_traceback())
 
 		callback_url = frappe.utils.get_url() + "/api/method/nextiq.api.scan_callback"
 		logger.info(f"[NextIQ] Calling service at {SERVICE_URL}, job_id={log.job_id}")
@@ -843,7 +843,7 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 		_send_scan_notification(log_name, "quota_exceeded", message=str(e))
 	except Exception as e:
 		logger.error(f"[NextIQ] Failed to fire scan {log_name}: {e}\n{traceback.format_exc()}")
-		frappe.log_error(traceback.format_exc(), f"NextIQ: Fire Scan Failed: {log_name}")
+		frappe.log_error(f"NextIQ: Fire Scan Failed: {log_name}", traceback.format_exc())
 		frappe.db.set_value("Card Scan Log", log_name, {
 			"status": "Failed",
 			"error_message": str(e)[:1000],
@@ -900,8 +900,8 @@ def _append_media_comment(ref_doctype, ref_name, log_name, comment_type="Info"):
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
-			frappe.get_traceback(),
 			f"NextIQ: Media comment failed for {ref_doctype} {ref_name}",
+			frappe.get_traceback(),
 		)
 
 
@@ -922,8 +922,8 @@ def _append_scan_note(lead_name, log_name, scanned_by):
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
-			frappe.get_traceback(),
 			f"NextIQ: Note append failed for Lead {lead_name}",
+			frappe.get_traceback(),
 		)
 
 
@@ -946,8 +946,8 @@ def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
-			frappe.get_traceback(),
 			f"NextIQ: Note append failed for CRM Lead {crm_lead_name}",
+			frappe.get_traceback(),
 		)
 
 
@@ -1014,8 +1014,8 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 				lead_doc.save(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
-				frappe.log_error(frappe.get_traceback(),
-					f"NextIQ: ERPNext Note failed for Lead {lead_name}")
+				frappe.log_error(f"NextIQ: ERPNext Note failed for Lead {lead_name}",
+					frappe.get_traceback())
 
 		# ── Tasks (ToDo) ────────────────────────────────────────────────────────
 		try:
@@ -1036,8 +1036,8 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 			if tasks:
 				frappe.db.commit()
 		except Exception:
-			frappe.log_error(frappe.get_traceback(),
-				f"NextIQ: ERPNext Tasks failed for Lead {lead_name}")
+			frappe.log_error(f"NextIQ: ERPNext Tasks failed for Lead {lead_name}",
+				frappe.get_traceback())
 
 		# ── Events ─────────────────────────────────────────────────────────────
 		_VALID_CATEGORIES = {"Event", "Meeting", "Call", "Sent/Received Email", "Other"}
@@ -1067,8 +1067,8 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 			if events:
 				frappe.db.commit()
 		except Exception:
-			frappe.log_error(frappe.get_traceback(),
-				f"NextIQ: ERPNext Events failed for Lead {lead_name}")
+			frappe.log_error(f"NextIQ: ERPNext Events failed for Lead {lead_name}",
+				frappe.get_traceback())
 
 	finally:
 		frappe.set_user(_orig_user)
@@ -1110,8 +1110,8 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 				}).insert(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
-				frappe.log_error(frappe.get_traceback(),
-					f"NextIQ: CRM Note failed for {crm_lead_name}")
+				frappe.log_error(f"NextIQ: CRM Note failed for {crm_lead_name}",
+					frappe.get_traceback())
 
 		# ── Tasks as CRM Task ─────────────────────────────────────────────────
 		try:
@@ -1134,8 +1134,8 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 			if tasks:
 				frappe.db.commit()
 		except Exception:
-			frappe.log_error(frappe.get_traceback(),
-				f"NextIQ: CRM Tasks failed for {crm_lead_name}")
+			frappe.log_error(f"NextIQ: CRM Tasks failed for {crm_lead_name}",
+				frappe.get_traceback())
 
 		# ── Events ───────────────────────────────────────────────────────────
 		_VALID_CATEGORIES = {"Event", "Meeting", "Call", "Sent/Received Email", "Other"}
@@ -1167,8 +1167,8 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 			if events:
 				frappe.db.commit()
 		except Exception:
-			frappe.log_error(frappe.get_traceback(),
-				f"NextIQ: CRM Events failed for {crm_lead_name}")
+			frappe.log_error(f"NextIQ: CRM Events failed for {crm_lead_name}",
+				frappe.get_traceback())
 
 	finally:
 		frappe.set_user(_orig_user)
@@ -1208,8 +1208,8 @@ def _send_feedback_to_service(log_name, feedback_type):
 		)
 	except Exception:
 		frappe.log_error(
-			frappe.get_traceback(),
 			f"NextIQ: Feedback Send Failed: {log_name}",
+			frappe.get_traceback(),
 		)
 
 
@@ -1248,8 +1248,8 @@ def _send_scan_notification(log_name, outcome, lead_name=None, message=None, sca
 
 	except Exception:
 		frappe.log_error(
-			frappe.get_traceback(),
 			f"NextIQ: Email notification failed for {log_name}",
+			frappe.get_traceback(),
 		)
 
 
@@ -1377,11 +1377,20 @@ def complete_registration_wizard(email, company=None):
 	  3. Call complete_registration on nextiq.service
 	  4. Save API key, mark setup_complete = 1
 	"""
+	if "System Manager" not in frappe.get_roles(frappe.session.user):
+		frappe.throw("Not permitted.", frappe.PermissionError)
+
+	# Idempotency: already registered → return success immediately
+	settings_check = frappe.db.get_singles_dict("NextIQ Settings")
+	if int(settings_check.get("setup_complete") or 0) or settings_check.get("api_key"):
+		return {"success": True, "email": settings_check.get("registered_email") or email or ""}
+
 	email   = (email   or "").strip().lower()
 	company = (company or "").strip()
 
 	if not email:
-		frappe.throw("Email is required.")
+		return {"success": False, "error": "missing_fields",
+		        "message": "Please fill in all required fields."}
 
 	site_url = frappe.utils.get_url().rstrip("/")
 
@@ -1395,10 +1404,12 @@ def complete_registration_wizard(email, company=None):
 		ch_data = ch_resp.json().get("message", {})
 	except Exception:
 		frappe.log_error("NextIQ: get_registration_challenge failed", frappe.get_traceback())
-		frappe.throw("Could not reach NextIQ Service. Please try again.")
+		return {"success": False, "error": "internal_error",
+		        "message": "Could not reach NextIQ Service. Please try again."}
 
 	if not ch_data.get("success"):
-		frappe.throw(ch_data.get("message") or "Could not start registration. Please try again.")
+		return {"success": False, "error": "internal_error",
+		        "message": ch_data.get("message") or "Could not start registration. Please try again."}
 
 	challenge  = ch_data["challenge"]
 	session_id = ch_data["session_id"]
@@ -1409,6 +1420,7 @@ def complete_registration_wizard(email, company=None):
 	frappe.db.commit()
 
 	# Step 3: call complete_registration — nextiq.service will call back to get proof
+	result = {}
 	try:
 		reg_resp = requests.post(
 			f"{SERVICE_URL}/api/method/nextiq_service.api.complete_registration",
@@ -1424,22 +1436,29 @@ def complete_registration_wizard(email, company=None):
 		result = reg_resp.json().get("message", {})
 	except Exception:
 		frappe.log_error("NextIQ: complete_registration call failed", frappe.get_traceback())
-		frappe.throw("Registration request failed. Please try again.")
+		result = {"success": False, "error": "internal_error",
+		          "message": "Registration request failed. Please try again."}
 	finally:
-		# Always clear temporary fields
 		frappe.db.set_single_value("NextIQ Settings", "reg_challenge",  "")
 		frappe.db.set_single_value("NextIQ Settings", "reg_session_id", "")
 		frappe.db.commit()
 
 	if not result.get("success"):
-		frappe.throw(result.get("message") or "Registration failed. Please try again.")
+		return {"success": False,
+		        "error":   result.get("error") or "internal_error",
+		        "message": result.get("message") or "Registration failed. Please try again."}
 
 	# Step 4: save API key and mark setup complete
-	settings = frappe.get_single("NextIQ Settings")
-	settings.api_key         = result["api_key"]
-	settings.registered_email = result["email"]
-	settings.setup_complete  = 1
-	settings.save(ignore_permissions=True)
-	frappe.db.commit()
+	try:
+		settings = frappe.get_single("NextIQ Settings")
+		settings.api_key          = result["api_key"]
+		settings.registered_email = result["email"]
+		settings.setup_complete   = 1
+		settings.save(ignore_permissions=True)
+		frappe.db.commit()
+	except Exception:
+		frappe.log_error("NextIQ: settings save failed", frappe.get_traceback())
+		return {"success": False, "error": "internal_error",
+		        "message": "Registration succeeded but settings could not be saved. Please contact support."}
 
 	return {"success": True, "email": result["email"]}
