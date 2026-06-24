@@ -1,0 +1,1777 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Quick Scan | NextIQ{% endblock %}
+
+{% block navbar %}{# hidden — full-screen scanner #}{% endblock %}
+
+{% block head_include %}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    background: rgba(28, 114, 252, .18);
+    color: #111;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .web-footer,
+  footer {
+    display: none !important;
+  }
+
+  /* ── Root ─────────────────────────────────────────────────────────── */
+  .scanner-root {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #111;
+  }
+
+  #video-main {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* ── Flash overlay ────────────────────────────────────────────────── */
+  .capture-flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    transition: opacity .07s;
+  }
+
+  .capture-flash.active {
+    opacity: .4;
+  }
+
+  /* ── Header ───────────────────────────────────────────────────────── */
+  .header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 18px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* ── Balance pill ─────────────────────────────────────────────────── */
+  .balance-pill {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 50px;
+    background: #222;
+    border: 1px solid #3a3a3a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .3s, border-color .3s;
+    min-width: 80px;
+  }
+
+  .balance-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .3);
+    transition: background .3s;
+  }
+
+  .balance-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .6);
+    white-space: nowrap;
+    transition: color .3s;
+  }
+
+  .balance-pill.ok {
+    border-color: rgba(52, 211, 153, .25);
+  }
+
+  .balance-pill.ok .balance-dot {
+    background: #34d399;
+  }
+
+  .balance-pill.ok .balance-text {
+    color: #34d399;
+  }
+
+  .balance-pill.warn {
+    border-color: rgba(251, 191, 36, .25);
+  }
+
+  .balance-pill.warn .balance-dot {
+    background: #fbbf24;
+  }
+
+  .balance-pill.warn .balance-text {
+    color: #fbbf24;
+  }
+
+  .balance-pill.low {
+    border-color: rgba(248, 113, 113, .25);
+  }
+
+  .balance-pill.low .balance-dot {
+    background: #f87171;
+  }
+
+  .balance-pill.low .balance-text {
+    color: #f87171;
+  }
+
+  /* ── Tab switcher ─────────────────────────────────────────────────── */
+  .tab-row {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 76px + min(54.2vw, 214px) + 62px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    background: #222;
+    border: 1px solid #3a3a3a;
+    border-radius: 50px;
+    padding: 3px;
+    display: flex;
+    white-space: nowrap;
+  }
+
+  .tab-slider {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    border-radius: 50px;
+    background: #fff;
+    transition: left .32s cubic-bezier(.4, 0, .2, 1), width .32s cubic-bezier(.4, 0, .2, 1);
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+  }
+
+  .tab-pill {
+    padding: 7px 22px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .5);
+    cursor: pointer;
+    border-radius: 50px;
+    position: relative;
+    z-index: 1;
+    transition: color .28s;
+    user-select: none;
+  }
+
+  .tab-pill.active {
+    color: #111;
+  }
+
+  .tab-skip {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .38);
+    cursor: pointer;
+    padding: 7px 0;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: max-width .28s cubic-bezier(.4,0,.2,1), opacity .22s, padding .28s cubic-bezier(.4,0,.2,1);
+    white-space: nowrap;
+    user-select: none;
+    border-left: 1px solid transparent;
+  }
+
+  .tab-skip.visible {
+    max-width: 72px;
+    padding: 7px 14px;
+    opacity: 1;
+    pointer-events: auto;
+    border-left-color: rgba(255, 255, 255, .12);
+  }
+
+  .tab-skip:active {
+    color: rgba(255, 255, 255, .75);
+  }
+
+  /* ── Tap-to-focus ring ────────────────────────────────────────────── */
+  .focus-ring {
+    position: fixed;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+    pointer-events: none;
+    z-index: 50;
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 0;
+    transition: transform .18s cubic-bezier(.2,0,.2,1), opacity .18s;
+  }
+  .focus-ring.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .focus-ring.hide {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.8);
+    transition: transform .25s, opacity .25s;
+  }
+
+  /* ── Scan overlay ─────────────────────────────────────────────────── */
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  /* ── Card frame ───────────────────────────────────────────────────── */
+  .card-frame {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 76px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(86vw, 340px);
+    aspect-ratio: 1.586;
+    border-radius: 16px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .7);
+    overflow: visible;
+  }
+
+  /* Corner brackets — no full border, just L-shaped corners */
+  .corner {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border: 2.5px solid rgba(255, 255, 255, .75);
+    transition: border-color .35s, box-shadow .35s;
+  }
+
+  .c-tl {
+    top: -10px;
+    left: -10px;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 16px 0 0 0;
+  }
+
+  .c-tr {
+    top: -10px;
+    right: -10px;
+    border-left: 0;
+    border-bottom: 0;
+    border-radius: 0 16px 0 0;
+  }
+
+  .c-bl {
+    bottom: -10px;
+    left: -10px;
+    border-right: 0;
+    border-top: 0;
+    border-radius: 0 0 0 16px;
+  }
+
+  .c-br {
+    bottom: -10px;
+    right: -10px;
+    border-left: 0;
+    border-top: 0;
+    border-radius: 0 0 16px 0;
+  }
+
+  .card-frame:not(.steady) .corner {
+    animation: blink 2.4s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+
+    0%,
+    100% {
+      opacity: .8
+    }
+
+    50% {
+      opacity: .2
+    }
+  }
+
+  .card-frame.steady .corner {
+    border-color: #818cf8;
+    box-shadow: 0 0 12px rgba(129, 140, 248, .6);
+    animation: none;
+    opacity: 1;
+  }
+
+  /* ── Scan line (always active, smooth) ────────────────────────────── */
+  .scan-line {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    height: 1.5px;
+    background: linear-gradient(to right,
+        transparent 0%, rgba(255, 255, 255, 0) 8%,
+        rgba(255, 255, 255, .55) 40%, rgba(255, 255, 255, .8) 50%,
+        rgba(255, 255, 255, .55) 60%, rgba(255, 255, 255, 0) 92%,
+        transparent 100%);
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .card-frame.scanning .scan-line {
+    animation: scan-move 2.6s cubic-bezier(.45, .05, .55, .95) infinite;
+  }
+
+  @keyframes scan-move {
+    0% {
+      top: 6%;
+      opacity: 0;
+    }
+
+    8% {
+      opacity: 1;
+    }
+
+    92% {
+      opacity: 1;
+    }
+
+    100% {
+      top: 92%;
+      opacity: 0;
+    }
+  }
+
+  /* ── Status text below frame ──────────────────────────────────────── */
+  .status-text {
+    position: absolute;
+    bottom: -40px;
+    left: -30%;
+    right: -30%;
+    text-align: center;
+    color: rgba(255, 255, 255, .5);
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: .05px;
+  }
+
+  /* ── Bottom bar ───────────────────────────────────────────────────── */
+  .bottom-bar {
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+    left: 32px;
+    right: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 30;
+  }
+
+  /* Left slot: gallery picker or captured front thumbnail */
+  .thumb-slot {
+    width: 66px;
+    height: 42px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .08);
+    border: 1.5px solid rgba(255, 255, 255, .14);
+    overflow: hidden;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .1s, opacity .2s;
+  }
+
+  .thumb-slot:active {
+    transform: scale(.9);
+  }
+
+  .thumb-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-slot svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: rgba(255, 255, 255, .38);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Center: capture button */
+  .shutter-btn {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 5px rgba(255, 255, 255, .18), 0 4px 22px rgba(0, 0, 0, .35);
+    transition: transform .1s, background .3s, box-shadow .3s;
+  }
+
+  .shutter-btn:active {
+    transform: scale(.87);
+  }
+
+  .shutter-btn:disabled {
+    opacity: .4;
+    pointer-events: none;
+  }
+
+  .shutter-inner {
+    width: 53px;
+    height: 53px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, .1);
+  }
+
+  /* Right slot: invisible spacer to keep shutter centered */
+  .btn-spacer {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    visibility: hidden;
+  }
+
+  /* ── Notes bottom sheet (pre-scan only in quick scan) ─────────────── */
+  .notes-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .28s;
+  }
+
+  .notes-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .notes-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 201;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    transform: translateY(100%);
+    transition: transform .32s cubic-bezier(.4, 0, .2, 1);
+    max-height: 97vh;
+    overflow-y: auto;
+  }
+
+  .notes-sheet.open {
+    transform: translateY(0);
+  }
+
+  .notes-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: #d1d5db;
+    margin: 12px auto 0;
+  }
+
+  .notes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 10px;
+  }
+
+  .notes-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    margin: 0;
+  }
+
+  .notes-textarea {
+    display: block;
+    width: calc(100% - 40px);
+    margin: 0 20px;
+    min-height: 192px;
+    max-height: 300px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #111;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    transition: border-color .2s;
+    box-sizing: border-box;
+  }
+
+  .notes-textarea:focus {
+    border-color: #1c72fc;
+  }
+
+  .notes-textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  .notes-actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid #f3f4f6;
+    margin-top: 4px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px) !important;
+    display: flex;
+    gap: 10px;
+    padding: 12px 20px;
+  }
+
+  .notes-cancel-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    background: transparent;
+    border: 1.5px solid #e5e7eb;
+    color: #374151;
+    transition: background .15s;
+  }
+
+  .notes-cancel-btn:hover {
+    background: #f9fafb;
+  }
+
+  .notes-primary-btn {
+    flex: 1.4;
+    padding: 13px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    background: #111;
+    border: none;
+    color: #fff;
+    transition: background .15s, transform .1s;
+  }
+
+  .notes-primary-btn:active {
+    transform: scale(.98);
+  }
+
+  /* ── Notes section labels ─────────────────────────────────────────── */
+  .notes-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    padding: 14px 20px 6px;
+  }
+
+  /* ── Voice notes section ──────────────────────────────────────────── */
+  .voice-section {
+    padding: 0 20px;
+  }
+
+  .recording-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px 8px;
+  }
+
+  .recording-bar.active { display: flex; }
+
+  .recording-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ef4444;
+    flex-shrink: 0;
+    animation: rec-dot-blink 1s step-start infinite;
+  }
+
+  @keyframes rec-dot-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  .recording-timer {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ef4444;
+  }
+
+  .voice-clips {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+    max-height: 168px;
+    overflow-y: auto;
+  }
+
+  .voice-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(28, 114, 252, .05);
+    border: 1.5px solid rgba(28, 114, 252, .2);
+    border-radius: 12px;
+    padding: 8px 12px;
+  }
+
+  .voice-chip-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #1c72fc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  .voice-chip-icon:hover { background: #1558cc; }
+
+  .voice-chip-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: #fff;
+    stroke: none;
+  }
+
+  .voice-chip-label {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+  }
+
+  .voice-chip-dur {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .voice-chip-del {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    font-size: 16px;
+    line-height: 1;
+    transition: color .15s, background .15s;
+    padding: 0;
+    font-family: inherit;
+  }
+
+  .voice-chip-del:hover { color: #ef4444; background: rgba(239,68,68,.08); }
+
+  .btn-add-voice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1.5px dashed #d1d5db;
+    background: transparent;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+
+  .btn-add-voice:hover:not(.recording) {
+    border-color: #1c72fc;
+    color: #1c72fc;
+    background: rgba(28,114,252,.04);
+  }
+
+  .btn-add-voice.recording {
+    border-style: solid;
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, .06);
+    color: #ef4444;
+    animation: rec-pulse-border 1.4s ease-in-out infinite;
+  }
+
+  @keyframes rec-pulse-border {
+    0%, 100% { border-color: rgba(239, 68, 68, .4); }
+    50%       { border-color: rgba(239, 68, 68, .9); }
+  }
+
+  .btn-add-voice svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+
+  /* ── Notes button ─────────────────────────────────────────────────── */
+  .btn-notes {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .08);
+    border: 1.5px solid rgba(255, 255, 255, .14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background .2s, border-color .2s, transform .1s;
+    position: relative;
+  }
+
+  .btn-notes:active {
+    transform: scale(.88);
+  }
+
+  .btn-notes svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: rgba(255, 255, 255, .65);
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke .2s;
+  }
+
+  .btn-notes.has-note {
+    background: rgba(28, 114, 252, .12);
+    border-color: rgba(28, 114, 252, .4);
+  }
+
+  .btn-notes.has-note svg {
+    stroke: #1c72fc;
+  }
+
+  .notes-badge {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1c72fc;
+    border: 1.5px solid #111;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+  }
+
+  .btn-notes.has-note .notes-badge {
+    opacity: 1;
+  }
+
+  /* ── Toast ────────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: rgba(20, 20, 28, .92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, .08);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity .2s, transform .25s cubic-bezier(.34, 1.3, .64, 1);
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .3);
+    position: relative;
+    top: 0;
+    align-self: center;
+    display: inline-block;
+  }
+
+  .toast.is-success .toast-dot {
+    background: #34d399;
+  }
+
+  .toast.is-error .toast-dot {
+    background: #f87171;
+  }
+
+  .toast.is-info .toast-dot {
+    background: #818cf8;
+  }
+
+  /* ── Update blocker ───────────────────────────────────────────────── */
+  .update-blocker {
+    position: fixed;
+    inset: 0;
+    background: rgba(100, 100, 120, .35);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 9999;
+  }
+
+  .update-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 36px 28px 28px;
+    text-align: center;
+    max-width: 360px;
+    width: 100%;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, .14), 0 4px 16px rgba(0, 0, 0, .08);
+    position: relative;
+  }
+
+  .update-icon-wrap {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(251, 146, 60, .12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+  }
+
+  .update-icon-wrap svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: #f97316;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .update-card h2 {
+    color: #111;
+    font-size: 19px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    letter-spacing: -.2px;
+  }
+
+  .update-card p {
+    color: #6b7280;
+    font-size: 13.5px;
+    line-height: 1.6;
+    margin: 0 0 6px;
+  }
+
+  .update-versions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 18px 0 0;
+  }
+
+  .update-version-pill {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    border-radius: 10px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    flex: 1;
+    max-width: 130px;
+  }
+
+  .update-version-pill span {
+    display: block;
+    color: #9ca3af;
+    font-size: 10px;
+    font-weight: 500;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  .update-version-pill.required {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #c2410c;
+  }
+
+  .update-version-pill.required span {
+    color: #f97316;
+  }
+
+  .update-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .update-check-btn {
+    flex: 1;
+    background: #f97316;
+    border: none;
+    color: #fff;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    font-family: inherit;
+  }
+
+  .update-check-btn:hover:not(:disabled) {
+    background: #ea6c0a;
+  }
+
+  .update-check-btn:active:not(:disabled) {
+    transform: scale(.97);
+  }
+
+  .update-check-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+
+  .update-admin-note {
+    display: inline-block;
+    margin-top: 6px;
+    color: #c2410c;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .update-check-msg {
+    margin-top: 12px !important;
+    font-size: 12px !important;
+    color: #9ca3af !important;
+    min-height: 16px;
+  }
+</style>
+{% endblock %}
+
+{% block page_content %}
+{% if needs_mandatory_update %}
+<div class="update-blocker">
+  <div class="update-card">
+    <div class="update-icon-wrap">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      </svg>
+    </div>
+    <h2>Update Required</h2>
+    <p>Your NextIQ app is out of date and can't connect to the scanning service.<br><span class="update-admin-note">Ask your administrator to update the app to continue.</span></p>
+    <div class="update-versions">
+      <div class="update-version-pill">
+        <span>Installed</span>
+        v{{ current_version }}
+      </div>
+      <div class="update-version-pill required">
+        <span>Required</span>
+        v{{ service_min_version }}+
+      </div>
+    </div>
+    <div class="update-actions">
+      <button class="update-check-btn" id="btn-check-update" onclick="checkForUpdates()">Check for Updates</button>
+    </div>
+    <p class="update-check-msg" id="update-check-msg"></p>
+  </div>
+</div>
+<script>
+function checkForUpdates() {
+  var btn = document.getElementById("btn-check-update");
+  var msg = document.getElementById("update-check-msg");
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  msg.textContent = "";
+  frappe.call({
+    method: "nextiq.version_check.check_service_version",
+    callback: function(r) {
+      if (r.exc) {
+        btn.disabled = false;
+        btn.textContent = "Check for Updates";
+        msg.textContent = "Check failed. Please try again.";
+        return;
+      }
+      location.reload();
+    },
+    error: function() {
+      btn.disabled = false;
+      btn.textContent = "Check for Updates";
+      msg.textContent = "Could not connect to the service. Please try again.";
+    }
+  });
+}
+</script>
+{% else %}
+<div class="scanner-root">
+
+  <video id="video-main" autoplay playsinline muted></video>
+  <div class="capture-flash" id="capture-flash"></div>
+  <div class="focus-ring" id="focus-ring"></div>
+
+  <!-- Header: balance pill -->
+  <div class="header">
+    <div class="balance-pill" id="balance-pill">
+      <span class="balance-dot" id="balance-dot"></span>
+      <span class="balance-text" id="balance-text">…</span>
+    </div>
+  </div>
+
+  <!-- Tab row: Front Side / Back Side / Skip -->
+  <div class="tab-row" id="tab-row">
+    <div class="tab-slider" id="tab-slider"></div>
+    <div class="tab-pill active" id="tab-front">Front Side</div>
+    <div class="tab-pill" id="tab-back">Back Side</div>
+    <div class="tab-skip" id="tab-skip">Skip →</div>
+  </div>
+
+  <!-- Scan overlay: frame + corners + scan line -->
+  <div class="scan-overlay">
+    <div class="card-frame" id="card-frame">
+      <div class="corner c-tl"></div>
+      <div class="corner c-tr"></div>
+      <div class="corner c-bl"></div>
+      <div class="corner c-br"></div>
+      <div class="scan-line"></div>
+      <div class="status-text" id="status-text">Align front of business card</div>
+    </div>
+  </div>
+
+  <!-- Bottom bar: thumbnail | shutter | notes -->
+  <div class="bottom-bar">
+
+    <div class="thumb-slot" id="thumb-slot">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
+      </svg>
+    </div>
+
+    <button class="shutter-btn" id="btn-shutter" aria-label="Capture">
+      <div class="shutter-inner"></div>
+    </button>
+
+    <button class="btn-notes" id="btn-notes" aria-label="Add note">
+      <span class="notes-badge" id="notes-badge"></span>
+      <svg viewBox="0 0 24 24">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+
+  </div>
+
+  <input type="file" id="gallery-input" accept="image/*" style="display:none" aria-hidden="true">
+</div>
+
+<!-- Notes sheet (pre-scan use only — no submit mode in quick scan) -->
+<div class="notes-backdrop" id="notes-backdrop"></div>
+<div class="notes-sheet" id="notes-sheet">
+  <div class="notes-handle"></div>
+  <div class="notes-header">
+    <h3>Add a note</h3>
+  </div>
+
+  <div class="notes-section-label">Written Notes</div>
+  <textarea class="notes-textarea" id="notes-textarea"
+    placeholder="e.g. Met at industry conference, interested in enterprise plan. Schedule a follow-up call next week…"
+    maxlength="2000"></textarea>
+
+  <div class="notes-section-label">Voice Notes</div>
+  <div class="voice-section">
+    <div class="recording-bar" id="recording-bar">
+      <div class="recording-dot"></div>
+      <div class="recording-timer" id="recording-timer">Recording… 0s</div>
+    </div>
+    <div class="voice-clips" id="voice-clips"></div>
+    <button class="btn-add-voice" id="btn-add-voice">
+      <svg viewBox="0 0 24 24" id="btn-add-voice-icon">
+        <rect x="9" y="2" width="6" height="11" rx="3"/>
+        <path d="M5 10a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+        <line x1="8" y1="22" x2="16" y2="22"/>
+      </svg>
+      <span id="btn-add-voice-label">Add voice note</span>
+    </button>
+  </div>
+
+  <div class="notes-actions">
+    <button class="notes-cancel-btn" id="notes-cancel-btn">Cancel</button>
+    <button class="notes-primary-btn" id="notes-primary-btn">Save Notes</button>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span class="toast-dot" id="toast-dot"></span>
+  <span class="toast-text" id="toast-text"></span>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block script %}
+{% if not needs_mandatory_update %}
+<script>
+  (function () {
+    "use strict";
+
+    // ── State ─────────────────────────────────────────────────────────────
+    let frontDataURL   = null;
+    let mediaStream    = null;
+    let step           = 1;
+    let scansRemaining = null;
+    let scansAllowed   = null;
+    let noteText       = "";
+
+    // ── DOM ───────────────────────────────────────────────────────────────
+    const video        = document.getElementById("video-main");
+    const cardFrame    = document.getElementById("card-frame");
+    const statusText   = document.getElementById("status-text");
+    const tabFront     = document.getElementById("tab-front");
+    const tabBack      = document.getElementById("tab-back");
+    const tabSkip      = document.getElementById("tab-skip");
+    const tabSlider    = document.getElementById("tab-slider");
+    const thumbSlot    = document.getElementById("thumb-slot");
+    const btnShutter      = document.getElementById("btn-shutter");
+    const btnNotes        = document.getElementById("btn-notes");
+    const notesSheet      = document.getElementById("notes-sheet");
+    const notesBackdrop   = document.getElementById("notes-backdrop");
+    const notesTextarea   = document.getElementById("notes-textarea");
+    const notesCancelBtn  = document.getElementById("notes-cancel-btn");
+    const notesPrimaryBtn = document.getElementById("notes-primary-btn");
+    const flashEl         = document.getElementById("capture-flash");
+
+    // ── Tab slider ────────────────────────────────────────────────────────
+    function slideTabTo(pill) {
+      const rowRect  = document.getElementById("tab-row").getBoundingClientRect();
+      const pillRect = pill.getBoundingClientRect();
+      tabSlider.style.left  = (pillRect.left - rowRect.left) + "px";
+      tabSlider.style.width = pillRect.width + "px";
+    }
+
+    function setActiveTab(which) {
+      tabFront.classList.toggle("active", which === "front");
+      tabBack.classList.toggle("active",  which === "back");
+      slideTabTo(which === "front" ? tabFront : tabBack);
+    }
+
+    // Tap Front Side tab on step 2 → redo front capture
+    tabFront.addEventListener("click", () => {
+      if (step === 2) { frontDataURL = null; goToStep1(); }
+    });
+
+    // Skip → submit immediately with front only (no notes popup)
+    tabSkip.addEventListener("click", () => {
+      if (step !== 2) return;
+      const f    = frontDataURL;
+      frontDataURL = null;
+      const note = noteText;
+      noteText = ""; notesTextarea.value = ""; updateNotesBadge();
+      goToStep1();
+      submitInBackground(f, null, note);
+    });
+
+    // ── Notes sheet (pre-scan only) ───────────────────────────────────────
+    let _sheetOriginalNote = "";
+
+    function updateNotesBadge() {
+      btnNotes.classList.toggle("has-note", noteText.length > 0);
+    }
+
+    function openNotesSheet() {
+      _sheetOriginalNote  = noteText;
+      notesTextarea.value = noteText;
+      notesPrimaryBtn.textContent = "Save Notes";
+      notesSheet.classList.add("open");
+      notesBackdrop.classList.add("open");
+      setTimeout(() => notesTextarea.focus(), 320);
+    }
+
+    function _closeSheet() {
+      notesSheet.classList.remove("open");
+      notesBackdrop.classList.remove("open");
+    }
+
+    btnNotes.addEventListener("click", () => openNotesSheet());
+
+    notesCancelBtn.addEventListener("click", () => {
+      noteText = _sheetOriginalNote;
+      notesTextarea.value = "";
+      updateNotesBadge();
+      _closeSheet();
+    });
+
+    notesPrimaryBtn.addEventListener("click", () => {
+      noteText = notesTextarea.value.trim();
+      updateNotesBadge();
+      _closeSheet();
+    });
+
+    // ── Camera ────────────────────────────────────────────────────────────
+    async function startCamera() {
+      stopCamera();
+      const tries = [
+        { video: { facingMode: { ideal: "environment" }, width: { min: 1280, ideal: 3840 }, height: { min: 720, ideal: 2160 } } },
+        { video: { facingMode: "environment" } },
+        { video: true },
+      ];
+      for (const c of tries) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(c);
+          video.srcObject = mediaStream;
+          await video.play();
+          return;
+        } catch (_) { }
+      }
+      showToast("Camera unavailable", "error", 0);
+    }
+
+    function stopCamera() {
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    }
+
+    // ── Tap-to-focus ──────────────────────────────────────────────────────
+    const focusRing = document.getElementById("focus-ring");
+    let focusTimer  = null;
+
+    function showFocusRing(x, y) {
+      focusRing.style.left = x + "px";
+      focusRing.style.top  = y + "px";
+      focusRing.classList.remove("hide");
+      focusRing.classList.add("show");
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => {
+        focusRing.classList.replace("show", "hide");
+      }, 1200);
+    }
+
+    async function tapToFocus(x, y) {
+      if (!mediaStream) return;
+      const track = mediaStream.getVideoTracks()[0];
+      if (!track) return;
+      showFocusRing(x, y);
+      const nx = x / window.innerWidth;
+      const ny = y / window.innerHeight;
+      try {
+        const caps = track.getCapabilities();
+        if (caps.focusMode && caps.focusMode.includes("manual") && caps.pointsOfInterest) {
+          await track.applyConstraints({
+            advanced: [{ focusMode: "manual", pointsOfInterest: [{ x: nx, y: ny }] }],
+          });
+          setTimeout(() => {
+            if (track.readyState === "live" && caps.focusMode.includes("continuous")) {
+              track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+            }
+          }, 2000);
+        }
+      } catch (_) { }
+    }
+
+    video.addEventListener("click", e => tapToFocus(e.clientX, e.clientY));
+    video.addEventListener("touchend", e => {
+      const t = e.changedTouches[0];
+      tapToFocus(t.clientX, t.clientY);
+    }, { passive: true });
+
+    // ── Crop to card frame ────────────────────────────────────────────────
+    function screenRectToVideo(rect) {
+      const vw = video.videoWidth  || 1280;
+      const vh = video.videoHeight || 720;
+      const scale = Math.max(window.innerWidth / vw, window.innerHeight / vh);
+      const ox = (vw * scale - window.innerWidth)  / 2;
+      const oy = (vh * scale - window.innerHeight) / 2;
+      return {
+        x: (rect.left + ox) / scale,
+        y: (rect.top  + oy) / scale,
+        w: rect.width  / scale,
+        h: rect.height / scale,
+      };
+    }
+
+    function cropToCardFrame() {
+      const rect = cardFrame.getBoundingClientRect();
+      const vr   = screenRectToVideo(rect);
+      const x = Math.max(0, Math.round(vr.x));
+      const y = Math.max(0, Math.round(vr.y));
+      const w = Math.min(Math.round(vr.w), video.videoWidth  - x);
+      const h = Math.min(Math.round(vr.h), video.videoHeight - y);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(video, x, y, w, h, 0, 0, w, h);
+      return cv.toDataURL("image/jpeg", 0.92);
+    }
+
+    // ── Flash ──────────────────────────────────────────────────────────────
+    function flashCapture() {
+      flashEl.classList.add("active");
+      setTimeout(() => flashEl.classList.remove("active"), 90);
+    }
+
+    // ── Capture — step 2 submits immediately, no popup ────────────────────
+    function doCapture() {
+      flashCapture();
+      if (step === 1) {
+        frontDataURL = cropToCardFrame();
+        goToStep2();
+      } else {
+        const backURL = cropToCardFrame();
+        const f       = frontDataURL;
+        frontDataURL  = null;
+        const note    = noteText;
+        noteText = ""; notesTextarea.value = ""; updateNotesBadge();
+        goToStep1();
+        submitInBackground(f, backURL, note);
+      }
+    }
+
+    // ── Step transitions ───────────────────────────────────────────────────
+    function goToStep1() {
+      step = 1;
+      tabSkip.classList.remove("visible");
+      statusText.textContent = "Align front of business card";
+      setActiveTab("front");
+      thumbSlot.innerHTML = `<svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>`;
+      thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
+    }
+
+    function goToStep2() {
+      step = 2;
+      tabSkip.classList.add("visible");
+      statusText.textContent = "Flip — align back side";
+      setActiveTab("back");
+      const img = new Image();
+      img.src = frontDataURL;
+      thumbSlot.innerHTML = "";
+      thumbSlot.appendChild(img);
+      thumbSlot.onclick = () => { galleryInput.value = ""; galleryInput.click(); };
+    }
+
+    // ── Image compression + merge ──────────────────────────────────────────
+    const MAX_PX    = 900;
+    const MAX_BYTES = 900_000;
+    const QUALITIES = [0.82, 0.72, 0.62];
+
+    function loadScaled(dataURL, maxPx) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > maxPx || h > maxPx) {
+            const r = Math.min(maxPx / w, maxPx / h);
+            w = Math.round(w * r); h = Math.round(h * r);
+          }
+          resolve({ img, w, h });
+        };
+        img.src = dataURL;
+      });
+    }
+
+    function b64Bytes(d) {
+      const b = (d.split(",")[1] || "");
+      return Math.floor(b.length * 3 / 4) - (b.match(/=+$/) || [""])[0].length;
+    }
+
+    async function scaleSingleImage(dataURL) {
+      const { img, w, h } = await loadScaled(dataURL, MAX_PX);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, w, h);
+      let result;
+      for (const q of QUALITIES) {
+        result = cv.toDataURL("image/jpeg", q);
+        if (b64Bytes(result) <= MAX_BYTES) break;
+      }
+      return result;
+    }
+
+    async function mergeImages(frontURL, backURL) {
+      const [f, b] = await Promise.all([loadScaled(frontURL, MAX_PX), loadScaled(backURL, MAX_PX)]);
+      const GAP = 20, PAD = 10, LH = 26;
+      const cv  = document.createElement("canvas");
+      cv.width  = f.w + GAP + b.w + PAD * 2;
+      cv.height = Math.max(f.h, b.h) + PAD * 2 + LH;
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#f8f9fa"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#555"; ctx.font = "bold 18px Arial,sans-serif";
+      ctx.fillText("FRONT", PAD, LH - 6);
+      ctx.fillText("BACK",  PAD + f.w + GAP, LH - 6);
+      ctx.drawImage(f.img, 0, 0, f.img.naturalWidth, f.img.naturalHeight, PAD, LH + PAD, f.w, f.h);
+      ctx.drawImage(b.img, 0, 0, b.img.naturalWidth, b.img.naturalHeight, PAD + f.w + GAP, LH + PAD, b.w, b.h);
+      let result;
+      for (const q of QUALITIES) {
+        result = cv.toDataURL("image/jpeg", q);
+        if (b64Bytes(result) <= MAX_BYTES) break;
+      }
+      if (b64Bytes(result) > MAX_BYTES) {
+        const cv2 = document.createElement("canvas");
+        cv2.width  = Math.round(cv.width  / 2);
+        cv2.height = Math.round(cv.height / 2);
+        cv2.getContext("2d").drawImage(cv, 0, 0, cv2.width, cv2.height);
+        result = cv2.toDataURL("image/jpeg", 0.62);
+      }
+      return result;
+    }
+
+    // ── API helper ────────────────────────────────────────────────────────
+    function apiCall(method, args) {
+      return new Promise((resolve, reject) => {
+        frappe.call({
+          method:   method,
+          args:     args || {},
+          freeze:   false,
+          callback: r => resolve(r.message),
+          error:    r => reject(r),
+        });
+      });
+    }
+
+    // ── Balance ────────────────────────────────────────────────────────────
+    const balancePill = document.getElementById("balance-pill");
+    const balanceText = document.getElementById("balance-text");
+
+    function renderBalance() {
+      if (scansRemaining === null) { balanceText.textContent = "…"; balancePill.className = "balance-pill"; return; }
+      balanceText.textContent = scansRemaining + " left";
+      const pct = scansAllowed > 0 ? scansRemaining / scansAllowed : 0;
+      balancePill.className = "balance-pill " + (
+        pct <= 0 || scansRemaining === 0 ? "low" : pct < 0.2 ? "warn" : "ok"
+      );
+    }
+
+    function fetchBalance() {
+      apiCall("nextiq.api.get_live_balance").then(d => {
+        if (d && d.success) {
+          scansRemaining = d.scans_remaining;
+          scansAllowed   = d.scans_allowed;
+          renderBalance();
+        }
+      }).catch(() => {});
+    }
+
+    // ── Voice recording — multi-clip (max 3) ──────────────────────────────
+    const MAX_VOICE_CLIPS = 3;
+    const MAX_RECORD_SEC  = 60;
+
+    let voiceClips       = [];
+    let mediaRecorder    = null;
+    let recordingChunks  = [];
+    let recordingTimer   = null;
+    let recordingSeconds = 0;
+    let _activeMime      = "audio/webm";
+
+    const recordingBar     = document.getElementById("recording-bar");
+    const recordingTimerEl = document.getElementById("recording-timer");
+    const voiceClipsEl     = document.getElementById("voice-clips");
+    const btnAddVoice      = document.getElementById("btn-add-voice");
+    const btnAddVoiceIcon  = document.getElementById("btn-add-voice-icon");
+    const btnAddVoiceLabel = document.getElementById("btn-add-voice-label");
+
+    const MIC_SVG  = `<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>`;
+    const STOP_SVG = `<rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor" stroke="none"/>`;
+
+    function _setRecordingBtn(isRecording) {
+      btnAddVoiceIcon.innerHTML = isRecording ? STOP_SVG : MIC_SVG;
+      btnAddVoiceLabel.textContent = isRecording ? "Stop recording" : "Add voice note";
+      btnAddVoice.classList.toggle("recording", isRecording);
+    }
+
+    const AUDIO_TYPES = [
+      "audio/webm;codecs=opus",
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+      "audio/webm",
+    ];
+
+    function _fmtSec(s) {
+      const m = Math.floor(s / 60), sec = s % 60;
+      return m > 0 ? `${m}:${String(sec).padStart(2,"0")}` : `0:${String(sec).padStart(2,"0")}`;
+    }
+
+    function _renderClips() {
+      voiceClipsEl.innerHTML = "";
+      voiceClips.forEach((clip, i) => {
+        const chip = document.createElement("div");
+        chip.className = "voice-chip";
+
+        const playBtn = document.createElement("div");
+        playBtn.className = "voice-chip-icon";
+        playBtn.title = "Play";
+        playBtn.innerHTML = `<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>`;
+        let audio = null;
+        playBtn.addEventListener("click", () => {
+          if (audio && !audio.paused) {
+            audio.pause(); audio.currentTime = 0;
+            playBtn.innerHTML = `<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>`;
+            return;
+          }
+          audio = new Audio(`data:${clip.mime};base64,${clip.base64}`);
+          playBtn.innerHTML = `<svg viewBox="0 0 16 16"><rect x="3" y="2" width="3" height="12"/><rect x="10" y="2" width="3" height="12"/></svg>`;
+          audio.play();
+          audio.onended = () => {
+            playBtn.innerHTML = `<svg viewBox="0 0 16 16"><polygon points="4,2 14,8 4,14"/></svg>`;
+          };
+        });
+
+        const label = document.createElement("div");
+        label.className = "voice-chip-label";
+        label.textContent = `Voice Note ${i + 1}`;
+
+        const dur = document.createElement("div");
+        dur.className = "voice-chip-dur";
+        dur.textContent = _fmtSec(clip.durationSec);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "voice-chip-del";
+        delBtn.textContent = "×";
+        delBtn.title = "Remove";
+        delBtn.addEventListener("click", () => {
+          if (audio && !audio.paused) { audio.pause(); }
+          voiceClips.splice(i, 1);
+          _renderClips();
+          _updateAddBtn();
+        });
+
+        chip.append(playBtn, label, dur, delBtn);
+        voiceClipsEl.appendChild(chip);
+      });
+    }
+
+    function _stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      clearInterval(recordingTimer);
+      recordingBar.classList.remove("active");
+      _setRecordingBtn(false);
+    }
+
+    function _updateAddBtn() {
+      const isRecording = mediaRecorder && mediaRecorder.state === "recording";
+      btnAddVoice.style.display =
+        (!isRecording && voiceClips.length >= MAX_VOICE_CLIPS) ? "none" : "flex";
+    }
+
+    btnAddVoice.addEventListener("click", async () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        _stopRecording();
+        return;
+      }
+      if (voiceClips.length >= MAX_VOICE_CLIPS) return;
+      try {
+        const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = AUDIO_TYPES.find(t => MediaRecorder.isTypeSupported(t)) || "";
+        _activeMime    = mimeType || "audio/webm";
+        mediaRecorder  = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        recordingChunks = [];
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordingChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          const dur    = recordingSeconds;
+          const blob   = new Blob(recordingChunks, { type: _activeMime });
+          const reader = new FileReader();
+          reader.onload = ev => {
+            voiceClips.push({
+              base64:      ev.target.result.split(",")[1],
+              mime:        _activeMime,
+              durationSec: dur,
+            });
+            _renderClips();
+            _updateAddBtn();
+          };
+          reader.readAsDataURL(blob);
+        };
+        mediaRecorder.start(250);
+        recordingSeconds = 0;
+        recordingBar.classList.add("active");
+        recordingTimerEl.textContent = "Recording… 0s";
+        _setRecordingBtn(true);
+        recordingTimer = setInterval(() => {
+          recordingSeconds++;
+          recordingTimerEl.textContent = `Recording… ${recordingSeconds}s`;
+          if (recordingSeconds >= MAX_RECORD_SEC) _stopRecording();
+        }, 1000);
+      } catch (_) {
+        showToast("Microphone not available", "error", 3000);
+      }
+    });
+
+    function _resetVoice() {
+      _stopRecording();
+      voiceClips = [];
+      _renderClips();
+      _updateAddBtn();
+    }
+
+    // ── Submit ─────────────────────────────────────────────────────────────
+    let _locked = false;
+
+    async function submitInBackground(frontURL, backURL, notes) {
+      if (_locked) return;
+      if (scansRemaining !== null && scansRemaining <= 0) {
+        showToast("No scans remaining — please top up your quota", "error", 4000);
+        return;
+      }
+      _locked = true;
+      btnShutter.disabled = true;
+      showToast("Uploading…", "info", 8000);
+      try {
+        const merged  = backURL
+          ? await mergeImages(frontURL, backURL)
+          : await scaleSingleImage(frontURL);
+        const payload = {
+          merged_image_base64: merged.split(",")[1],
+          filename:            "business_card.jpg",
+          notes:               notes || "",
+        };
+        if (voiceClips.length > 0) {
+          payload.voice_clips = voiceClips.map(c => ({ base64: c.base64, mime: c.mime }));
+        }
+        await apiCall("nextiq.api.submit_card_scan", payload);
+        showToast("Card submitted", "success", 2000);
+        _resetVoice();
+        if (scansRemaining !== null) { scansRemaining = Math.max(0, scansRemaining - 1); renderBalance(); }
+        setTimeout(fetchBalance, 4000);
+      } catch (e) {
+        showToast("Upload failed", "error", 3000);
+      }
+      setTimeout(() => { btnShutter.disabled = false; _locked = false; }, 3000);
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    let _toastTimer = null;
+    function showToast(text, type, duration) {
+      const el = document.getElementById("toast");
+      document.getElementById("toast-text").textContent = text;
+      el.className = `toast show is-${type || "info"}`;
+      if (_toastTimer) clearTimeout(_toastTimer);
+      if (duration) _toastTimer = setTimeout(() => el.classList.remove("show"), duration);
+    }
+
+    // ── Button events ──────────────────────────────────────────────────────
+    btnShutter.addEventListener("click", doCapture);
+
+    const galleryInput = document.getElementById("gallery-input");
+    galleryInput.addEventListener("change", () => {
+      const file = galleryInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataURL = e.target.result;
+        flashCapture();
+        if (step === 1) {
+          frontDataURL = dataURL;
+          goToStep2();
+        } else {
+          const f      = frontDataURL;
+          frontDataURL = null;
+          const note   = noteText;
+          noteText = ""; notesTextarea.value = ""; updateNotesBadge();
+          goToStep1();
+          submitInBackground(f, dataURL, note);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // ── Keyboard — shift notes sheet above keyboard when it opens ─────────
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", () => {
+        const keyboardHeight = Math.max(0, window.innerHeight - window.visualViewport.height);
+        notesSheet.style.bottom = keyboardHeight + "px";
+      });
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    setTimeout(fetchBalance, 0);
+    startCamera().then(() => {
+      goToStep1();
+      requestAnimationFrame(() => {
+        slideTabTo(tabFront);
+      });
+    });
+
+  })();
+</script>
+{% endif %}
+{% endblock %}
