@@ -682,6 +682,12 @@
     transform: scale(.98);
   }
 
+  .notes-primary-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
   /* ── Notes section labels ─────────────────────────────────────────── */
   .notes-section-label {
     font-size: 11px;
@@ -1320,10 +1326,11 @@ function checkForUpdates() {
     }
 
     function _updatePrimaryBtn() {
-      const hasText = notesTextarea.value.trim().length > 0;
+      // A voice note counts as a note too — keep the button label/colour in sync
+      const hasNote = notesTextarea.value.trim().length > 0 || voiceClips.length > 0;
       if (_sheetSubmitMode) {
-        notesPrimaryBtn.textContent = hasText ? "Submit with Notes" : "Submit Without Notes";
-        notesPrimaryBtn.classList.toggle("has-note", hasText);
+        notesPrimaryBtn.textContent = hasNote ? "Submit with Notes" : "Submit Without Notes";
+        notesPrimaryBtn.classList.toggle("has-note", hasNote);
         notesPrimaryBtn.classList.add("is-submit");
       } else {
         notesPrimaryBtn.textContent = "Save Notes";
@@ -1681,6 +1688,9 @@ function checkForUpdates() {
       btnAddVoiceIcon.innerHTML = isRecording ? STOP_SVG : MIC_SVG;
       btnAddVoiceLabel.textContent = isRecording ? "Stop recording" : "Add voice note";
       btnAddVoice.classList.toggle("recording", isRecording);
+      // Block submit while a recording is still running, otherwise the clip is
+      // captured asynchronously after submit and leaks into the next scan
+      notesPrimaryBtn.disabled = isRecording;
     }
 
     const AUDIO_TYPES = [
@@ -1757,6 +1767,8 @@ function checkForUpdates() {
       const isRecording = mediaRecorder && mediaRecorder.state === "recording";
       btnAddVoice.style.display =
         (!isRecording && voiceClips.length >= MAX_VOICE_CLIPS) ? "none" : "flex";
+      // Reflect added/removed voice clips on the submit button (label + colour)
+      _updatePrimaryBtn();
     }
 
     btnAddVoice.addEventListener("click", async () => {
