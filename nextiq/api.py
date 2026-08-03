@@ -14,7 +14,7 @@ import frappe
 import requests
 
 import nextiq
-from nextiq.constants import SERVICE_URL
+from nextiq.oauth import _service_url
 from nextiq.version_check import _version_lt
 
 
@@ -38,7 +38,7 @@ def _do_refresh(settings):
 	refresh_token = settings.get_password("oauth_refresh_token")
 	client_id     = settings.oauth_client_id or frappe.conf.get("nextiq_oauth_client_id", "")
 	resp = requests.post(
-		f"{SERVICE_URL}/api/method/frappe.integrations.oauth2.get_token",
+		f"{_service_url()}/api/method/frappe.integrations.oauth2.get_token",
 		data={
 			"grant_type":    "refresh_token",
 			"refresh_token": refresh_token,

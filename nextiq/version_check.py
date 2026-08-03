@@ -2,7 +2,7 @@ import nextiq
 import frappe
 import requests
 
-from nextiq.constants import SERVICE_URL
+from nextiq.oauth import _service_url
 
 
 def _version_lt(v1, v2):
@@ -34,7 +34,7 @@ def check_service_version():
 			return
 
 		response = requests.get(
-			f"{SERVICE_URL}/api/method/nextiq_service.api.get_service_info",
+			f"{_service_url()}/api/method/nextiq_service.api.get_service_info",
 			headers={
 				"Authorization":           f"Bearer {access_token}",
 				"X-NextIQ-Client-Version": nextiq.__version__,
