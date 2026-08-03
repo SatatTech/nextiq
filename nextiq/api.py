@@ -844,7 +844,8 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 				frappe.log_error(f"NextIQ: Voice clip load failed for {log_name} — skipping", frappe.get_traceback())
 
 		callback_url = frappe.utils.get_url() + "/api/method/nextiq.api.scan_callback"
-		logger.info(f"[NextIQ] Calling service at {SERVICE_URL}, job_id={log.job_id}")
+		service_url  = _service_url()
+		logger.info(f"[NextIQ] Calling service at {service_url}, job_id={log.job_id}")
 
 		payload = {
 			"image_base64":    image_base64,
@@ -862,7 +863,7 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 
 		try:
 			response = requests.post(
-				f"{SERVICE_URL}/api/method/nextiq_service.api.process_scan",
+				f"{service_url}/api/method/nextiq_service.api.process_scan",
 				json=payload,
 				headers={
 					"Content-Type":            "application/json",
@@ -873,7 +874,7 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 			)
 		except requests.exceptions.ConnectionError:
 			raise Exception(
-				f"Cannot reach NextIQ Service at {SERVICE_URL}. "
+				f"Cannot reach NextIQ Service at {service_url}. "
 				"Please contact support."
 			)
 		except requests.exceptions.Timeout:
@@ -1282,7 +1283,7 @@ def _send_feedback_to_service(log_name, feedback_type):
 			return
 
 		requests.post(
-			f"{SERVICE_URL}/api/method/nextiq_service.api.receive_scan_feedback",
+			f"{_service_url()}/api/method/nextiq_service.api.receive_scan_feedback",
 			json={
 				"job_id":          log.job_id,
 				"feedback_type":   feedback_type,
@@ -1377,10 +1378,11 @@ def get_live_balance():
 	Returns the service response dict, or {"success": False, ...} on error.
 	"""
 	access_token = _get_valid_access_token()
+	service_url  = _service_url()
 
 	try:
 		resp = requests.get(
-			f"{SERVICE_URL}/api/method/nextiq_service.api.check_quota",
+			f"{service_url}/api/method/nextiq_service.api.check_quota",
 			headers={
 				"Authorization": f"Bearer {access_token}",
 				"Content-Type":  "application/json",
@@ -1388,7 +1390,7 @@ def get_live_balance():
 			timeout=10,
 		)
 	except requests.exceptions.ConnectionError:
-		frappe.throw(f"Cannot reach NextIQ Service at {SERVICE_URL}.",
+		frappe.throw(f"Cannot reach NextIQ Service at {service_url}.",
 					 title="Connection Error")
 	except requests.exceptions.Timeout:
 		frappe.throw("NextIQ Service did not respond in time.", title="Timeout")
