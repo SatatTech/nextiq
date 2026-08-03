@@ -54,3 +54,9 @@ typing-modules = ["frappe.types.DF"]
 quote-style = "double"
 indent-style = "tab"
 docstring-code-format = true
+
+# Declares the Frappe major version this app is compatible with. Frappe Cloud
+# reads this to pick a matching Frappe build; without it the deploy fails with
+# "Could not find compatible Frappe version in pyproject.toml file."
+[tool.bench.frappe-dependencies]
+frappe = ">=14.0.0,<17.0.0"
