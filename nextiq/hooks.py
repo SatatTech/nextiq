@@ -1,3 +1,8 @@
+fixtures = [
+	{"doctype": "Onboarding Step", "filters": [["name", "like", "NIQ Client - %"]]},
+	{"doctype": "Module Onboarding", "filters": [["module", "=", "NextIQ"]]},
+]
+
 app_name = "nextiq"
 app_title = "NextIQ"
 app_publisher = "krushang.patel@satat.tech"
@@ -13,15 +18,13 @@ boot_session = "nextiq.boot.boot_session"
 required_apps = ["erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "nextiq",
-# 		"logo": "/assets/nextiq/logo.png",
-# 		"title": "NextIQ",
-# 		"route": "/nextiq",
-# 		"has_permission": "nextiq.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "nextiq",
+		"title": "NextIQ",
+		"route": "/desk/nextiq",
+	}
+]
 
 # Includes in <head>
 # ------------------
