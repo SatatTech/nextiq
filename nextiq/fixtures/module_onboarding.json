@@ -1,0 +1,18 @@
+[
+ {
+  "doctype": "Module Onboarding",
+  "name": "NextIQ",
+  "title": "Get Started with NextIQ",
+  "module": "NextIQ",
+  "is_complete": 0,
+  "docstatus": 0,
+  "allow_roles": [
+   {"role": "Desk User"}
+  ],
+  "steps": [
+   {"step": "NIQ Client - Scan a Card"},
+   {"step": "NIQ Client - Add Voice Note"},
+   {"step": "NIQ Client - Check Balance"}
+  ]
+ }
+]
