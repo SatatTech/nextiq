@@ -21,6 +21,7 @@ required_apps = ["erpnext"]
 add_to_apps_screen = [
 	{
 		"name": "nextiq",
+		"logo": "/assets/nextiq/images/nextiq-logo.svg",
 		"title": "NextIQ",
 		"route": "/desk/nextiq",
 	}
