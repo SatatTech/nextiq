@@ -674,6 +674,18 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			make_crm = destination in ("Frappe CRM", "Both") and "crm" in installed
 
 			try:
+				if not make_erpnext and not make_crm:
+					# lead_destination requires an app (ERPNext/CRM) that isn't installed —
+					# NextIQ Settings.validate() blocks setting this going forward, but a
+					# site that already had it saved before that app was uninstalled would
+					# otherwise fall through to the success block below with no lead at
+					# all. Raise so this lands in the same Failed/notify/feedback path as
+					# every other lead-creation error instead of silently reporting Success.
+					raise RuntimeError(
+						f"Lead Destination is set to {destination!r}, but the required app "
+						"is not installed on this site. Update NextIQ Settings."
+					)
+
 				if make_erpnext:
 					lead_name = _create_erpnext_lead(data.copy(), address_data, scanned_by, log_name)
 
