@@ -7,12 +7,13 @@
  "idx": 0,
  "items": [
   {"label": "Card Scan Logs", "type": "Link", "link_type": "DocType", "link_to": "Card Scan Log", "idx": 1},
-  {"label": "My Balance", "type": "Link", "link_type": "Page", "link_to": "nextiq-balance", "idx": 2},
-  {"label": "NextIQ Settings", "type": "Link", "link_type": "DocType", "link_to": "NextIQ Settings", "icon": "settings", "idx": 3},
-  {"label": "Reports", "type": "Section Break", "idx": 4},
-  {"label": "Card Scan Usage Report", "type": "Link", "link_type": "Report", "link_to": "Card Scan Usage Report", "icon": "table", "child": 1, "idx": 5}
+  {"label": "Scan Portal", "type": "Link", "link_type": "URL", "url": "/card-scan", "icon": "scan-line", "idx": 2},
+  {"label": "My Balance", "type": "Link", "link_type": "Page", "link_to": "nextiq-balance", "idx": 3},
+  {"label": "NextIQ Settings", "type": "Link", "link_type": "DocType", "link_to": "NextIQ Settings", "icon": "settings", "idx": 4},
+  {"label": "Reports", "type": "Section Break", "idx": 5},
+  {"label": "Card Scan Usage Report", "type": "Link", "link_type": "Report", "link_to": "Card Scan Usage Report", "icon": "table", "child": 1, "idx": 6}
  ],
- "modified": "2026-08-04 00:00:00.000000",
+ "modified": "2026-08-07 01:00:00.000000",
  "modified_by": "Administrator",
  "module": "NextIQ",
  "module_onboarding": "NextIQ",
