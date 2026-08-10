@@ -16,7 +16,7 @@ from nextiq.constants import SERVICE_URL
 
 def _service_url():
     # site_config override for dev; falls back to the baked-in production URL
-    return frappe.conf.get("nextiq_service_url") or SERVICE_URL
+    return SERVICE_URL
 
 
 def _relay_secret():
