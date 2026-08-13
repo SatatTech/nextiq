@@ -102,6 +102,25 @@ def _get_valid_access_token():
 		frappe.cache.delete_value(_REFRESH_LOCK_KEY)
 
 
+def _get_service_auth_headers():
+	"""
+	Bearer token if OAuth-connected; otherwise fall back to the legacy
+	X-NextIQ-API-Key header. Customers who were on the API key before this
+	OAuth rewrite shipped never lost that key — this keeps them working
+	until they actively click Connect in NextIQ Settings.
+	"""
+	settings = frappe.get_single("NextIQ Settings")
+	if settings.connection_status == "Connected" and settings.oauth_access_token:
+		return {"Authorization": f"Bearer {_get_valid_access_token()}"}
+	api_key = settings.get_password("api_key")
+	if api_key:
+		return {"X-NextIQ-API-Key": api_key}
+	frappe.throw(
+		"NextIQ Service is not connected. Please connect via NextIQ Settings.",
+		title="Not Connected",
+	)
+
+
 # Fields allowed when creating a Lead from scan data — mirrors the service-side list
 _ALLOWED_LEAD_FIELDS = frozenset({
 	"salutation", "first_name", "middle_name", "last_name",
@@ -829,7 +848,7 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 		frappe.db.set_value("Card Scan Log", log_name, "status", "Processing")
 		frappe.db.commit()
 
-		access_token = _get_valid_access_token()
+		auth_headers = _get_service_auth_headers()
 
 		log = frappe.get_doc("Card Scan Log", log_name)
 		if not log.merged_image:
@@ -879,8 +898,8 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 				json=payload,
 				headers={
 					"Content-Type":            "application/json",
-					"Authorization":           f"Bearer {access_token}",
 					"X-NextIQ-Client-Version": nextiq.__version__,
+					**auth_headers,
 				},
 				timeout=15,  # service should accept in <1s — short timeout
 			)
@@ -1285,12 +1304,9 @@ def _send_feedback_to_service(log_name, feedback_type):
 	"""
 	try:
 		log = frappe.get_doc("Card Scan Log", log_name)
-		settings = frappe.get_single("NextIQ Settings")
-		if settings.connection_status != "Connected" or not settings.oauth_access_token:
-			return
 
 		try:
-			access_token = _get_valid_access_token()
+			auth_headers = _get_service_auth_headers()
 		except Exception:
 			return
 
@@ -1304,8 +1320,8 @@ def _send_feedback_to_service(log_name, feedback_type):
 				"customer_log_id": log.name,
 			},
 			headers={
-				"Content-Type":  "application/json",
-				"Authorization": f"Bearer {access_token}",
+				"Content-Type": "application/json",
+				**auth_headers,
 			},
 			timeout=15,
 		)
@@ -1389,15 +1405,15 @@ def get_live_balance():
 
 	Returns the service response dict, or {"success": False, ...} on error.
 	"""
-	access_token = _get_valid_access_token()
+	auth_headers = _get_service_auth_headers()
 	service_url  = _service_url()
 
 	try:
 		resp = requests.get(
 			f"{service_url}/api/method/nextiq_service.api.check_quota",
 			headers={
-				"Authorization": f"Bearer {access_token}",
-				"Content-Type":  "application/json",
+				"Content-Type": "application/json",
+				**auth_headers,
 			},
 			timeout=10,
 		)
