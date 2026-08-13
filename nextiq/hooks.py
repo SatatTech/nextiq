@@ -1,6 +1,5 @@
 fixtures = [
 	{"doctype": "Onboarding Step", "filters": [["name", "like", "NIQ Client - %"]]},
-	{"doctype": "Module Onboarding", "filters": [["module", "=", "NextIQ"]]},
 ]
 
 app_name = "nextiq"
