@@ -16,7 +16,7 @@ bench install-app nextiq
 
 If you're a NextIQ customer (or want to become one), see the full step-by-step guide with screenshots:
 
-**[NextIQ Installation & Connection Guide](https://niqa-dev.frappe.cloud/docs)**
+**[NextIQ Installation & Connection Guide](https://nextiq.in/docs/nextiq-guidelines)**
 
 It covers two paths:
 
