@@ -23,21 +23,17 @@ def check_service_version():
 	in NextIQ Settings for the boot session to read.
 	"""
 	try:
-		settings = frappe.get_single("NextIQ Settings")
-		if settings.connection_status != "Connected" or not settings.oauth_access_token:
-			return
-
-		from nextiq.api import _get_valid_access_token
+		from nextiq.api import _get_service_auth_headers
 		try:
-			access_token = _get_valid_access_token()
+			auth_headers = _get_service_auth_headers()
 		except Exception:
 			return
 
 		response = requests.get(
 			f"{_service_url()}/api/method/nextiq_service.api.get_service_info",
 			headers={
-				"Authorization":           f"Bearer {access_token}",
 				"X-NextIQ-Client-Version": nextiq.__version__,
+				**auth_headers,
 			},
 			timeout=10,
 		)
