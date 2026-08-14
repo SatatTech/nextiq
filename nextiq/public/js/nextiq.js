@@ -37,8 +37,15 @@ nextiq._hide_banner = function () {
 	$("#nextiq-mandatory-update-banner").remove();
 };
 
-// Runs once per session on first page-change after boot
+// Redirect System Manager to setup wizard if NextIQ is not yet configured.
+// Runs on every page-change so stale boot data self-heals on next load.
 $(document).on("page-change", function () {
+	if (frappe.boot.nextiq_setup_needed
+			&& window.location.pathname !== "/nextiq-setup") {
+		window.location.href = "/nextiq-setup";
+		return;
+	}
+
 	if (frappe._nextiq_notifications_shown) return;
 	frappe._nextiq_notifications_shown = true;
 	setTimeout(nextiq.show_update_notifications, 1500);

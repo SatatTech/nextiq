@@ -7,6 +7,9 @@ def after_install():
 	from nextiq.version_check import check_service_version
 	check_service_version()
 	_sync_crm_fields()
+	# Fresh install — setup wizard must be completed before the app works
+	frappe.db.set_single_value("NextIQ Settings", "setup_complete", 0)
+	frappe.db.commit()
 
 
 def after_migrate():

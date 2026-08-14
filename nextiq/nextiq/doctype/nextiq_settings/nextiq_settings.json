@@ -4,6 +4,9 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "connection_section",
+  "setup_complete",
+  "registered_email",
   "api_key",
   "lead_destination_section",
   "lead_destination",
@@ -12,15 +15,36 @@
   "version_col_break_1",
   "needs_mandatory_update",
   "version_col_break_2",
-  "version_last_checked"
+  "version_last_checked",
+  "reg_section",
+  "reg_challenge",
+  "reg_session_id"
  ],
  "fields": [
   {
-   "description": "Your API key from NextIQ Service (provided by the NextIQ team)",
+   "fieldname": "connection_section",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "default": "0",
+   "fieldname": "setup_complete",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Setup Complete"
+  },
+  {
+   "fieldname": "registered_email",
+   "fieldtype": "Data",
+   "label": "Registered Account",
+   "read_only": 1,
+   "description": "Email used to register with NextIQ Service."
+  },
+  {
    "fieldname": "api_key",
    "fieldtype": "Password",
    "label": "API Key",
-   "reqd": 1
+   "description": "Set automatically by the setup wizard. You can also paste it manually."
   },
   {
    "fieldname": "lead_destination_section",
@@ -68,11 +92,34 @@
    "fieldtype": "Datetime",
    "label": "Last Checked",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "reg_section",
+   "fieldtype": "Section Break",
+   "label": "Registration State",
+   "hidden": 1
+  },
+  {
+   "fieldname": "reg_challenge",
+   "fieldtype": "Data",
+   "label": "Registration Challenge",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Temporary. Cleared after setup wizard completes."
+  },
+  {
+   "fieldname": "reg_session_id",
+   "fieldtype": "Data",
+   "label": "Registration Session ID",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Temporary. Cleared after setup wizard completes."
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-04-15 00:00:00.000000",
+ "modified": "2026-05-16 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "NextIQ",
  "name": "NextIQ Settings",

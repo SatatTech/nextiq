@@ -5,7 +5,7 @@
    "label": "Time Saved by NextIQ"
   }
  ],
- "content": "[{\"id\":\"nextiq_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">NextIQ</span>\",\"col\":12}},{\"id\":\"nextiq_spacer1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"nextiq_sc_portal\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Scan Portal\",\"col\":3}},{\"id\":\"nextiq_sc_logs\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Card Scan Logs\",\"col\":3}},{\"id\":\"nextiq_sc_report\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Card Scan Usage Report\",\"col\":3}},{\"id\":\"nextiq_sc_settings\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"NextIQ Settings\",\"col\":3}},{\"id\":\"nextiq_spacer2\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"nextiq_nc_scanned\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Lead Scanned\",\"col\":3}},{\"id\":\"nextiq_nc_created\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Lead Created\",\"col\":3}},{\"id\":\"nextiq_nc_invalid\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Invalid Data Leads\",\"col\":3}},{\"id\":\"nextiq_nc_duplicate\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Duplicate Lead\",\"col\":3}},{\"id\":\"nextiq_spacer3\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"nextiq_chart_time\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Time Saved by NextIQ\",\"col\":12}}]",
+ "content": "[{\"id\":\"nextiq_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">NextIQ</span>\",\"col\":12}},{\"id\":\"nextiq_spacer1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"nextiq_sc_portal\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Scan Portal\",\"col\":3}},{\"id\":\"nextiq_sc_logs\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Card Scan Logs\",\"col\":3}},{\"id\":\"nextiq_sc_report\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Card Scan Usage Report\",\"col\":3}},{\"id\":\"nextiq_sc_settings\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"NextIQ Settings\",\"col\":3}},{\"id\":\"PyLIYf7Fpp\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Quick Scan\",\"col\":3}},{\"id\":\"nextiq_spacer2\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"nextiq_nc_scanned\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Lead Scanned\",\"col\":3}},{\"id\":\"nextiq_nc_created\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Lead Created\",\"col\":3}},{\"id\":\"nextiq_nc_invalid\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Invalid Data Leads\",\"col\":3}},{\"id\":\"nextiq_nc_duplicate\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Duplicate Lead\",\"col\":3}},{\"id\":\"nextiq_spacer3\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"nextiq_chart_time\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Time Saved by NextIQ\",\"col\":12}}]",
  "creation": "2026-04-19 00:00:00",
  "custom_blocks": [],
  "docstatus": 0,
@@ -18,8 +18,8 @@
  "is_hidden": 0,
  "label": "NextIQ",
  "links": [],
- "modified": "2026-04-19 00:00:00",
- "modified_by": "Administrator",
+ "modified": "2026-05-19 16:18:01.726135",
+ "modified_by": "mihir.patel@team.satat.tech",
  "module": "NextIQ",
  "name": "NextIQ",
  "number_cards": [
@@ -45,11 +45,19 @@
  "public": 1,
  "quick_lists": [],
  "roles": [],
+ "sequence_id": 0.0,
  "shortcuts": [
   {
    "label": "Scan Portal",
    "type": "URL",
    "url": "/card-scan"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Quick Scan",
+   "type": "URL",
+   "url": "/quick-scan"
   },
   {
    "label": "Card Scan Logs",
@@ -59,6 +67,7 @@
   {
    "label": "Card Scan Usage Report",
    "link_to": "Card Scan Usage Report",
+   "report_ref_doctype": "Card Scan Log",
    "type": "Report"
   },
   {
