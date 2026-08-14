@@ -2,7 +2,7 @@ import nextiq
 import frappe
 import requests
 
-from nextiq.constants import SERVICE_URL
+from nextiq.oauth import _service_url
 
 
 def _version_lt(v1, v2):
@@ -23,17 +23,17 @@ def check_service_version():
 	in NextIQ Settings for the boot session to read.
 	"""
 	try:
-		settings = frappe.get_single("NextIQ Settings")
-		if not settings.api_key:
+		from nextiq.api import _get_service_auth_headers
+		try:
+			auth_headers = _get_service_auth_headers()
+		except Exception:
 			return
 
-		api_key = settings.get_password("api_key")
-
 		response = requests.get(
-			f"{SERVICE_URL}/api/method/nextiq_service.api.get_service_info",
+			f"{_service_url()}/api/method/nextiq_service.api.get_service_info",
 			headers={
-				"X-NextIQ-API-Key":        api_key,
 				"X-NextIQ-Client-Version": nextiq.__version__,
+				**auth_headers,
 			},
 			timeout=10,
 		)
