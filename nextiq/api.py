@@ -207,6 +207,9 @@ def _create_erpnext_lead(data, address_data, scanned_by, log_name):
 
 	_orig_user = frappe.session.user
 	try:
+		# Run as scanned_by so Lead.after_insert (and any assign/permission
+		# checks it triggers) passes — ignore_permissions on insert() does NOT
+		# cover those nested checks. Falls back to Administrator.
 		frappe.set_user(scanned_by or "Administrator")
 
 		for _attempt in range(len(data) + 1):
@@ -271,7 +274,9 @@ def _create_crm_lead(data, scanned_by, log_name):
 
 	_orig_user = frappe.session.user
 	try:
-		# Run as scanned_by: fixes CRM Lead assign_to() permission check in after_insert
+		# Run as scanned_by so CRM Lead.after_insert → assign_agent() →
+		# assign_to.add() passes its check_permission() — ignore_permissions on
+		# insert() does NOT cover that nested check. Falls back to Administrator.
 		frappe.set_user(scanned_by or "Administrator")
 
 		for _attempt in range(len(crm_data) + 1):
@@ -1137,7 +1142,11 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 			frappe.log_error(f"NextIQ: CRM Tasks failed for {crm_lead_name}",
 				frappe.get_traceback())
 
-		# ── Events ───────────────────────────────────────────────────────────
+		# ── Events → CRM Task ─────────────────────────────────────────────────
+		# Frappe CRM has no Events view — its lead timeline reads only CRM Task /
+		# FCRM Note / CRM Call Log, never the standard Event doctype. So surface
+		# scan "events" as scheduled CRM Tasks (category kept in the title) so they
+		# are actually visible on the lead.
 		_VALID_CATEGORIES = {"Event", "Meeting", "Call", "Sent/Received Email", "Other"}
 		try:
 			for event in events:
@@ -1146,28 +1155,25 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 				category = event.get("event_category", "Meeting")
 				if category not in _VALID_CATEGORIES:
 					category = "Other"
-				starts_on    = event.get("starts_on") or str(frappe.utils.today())
 				full_subject = _bi_inline(event.get("subject", ""), event.get("subject_native"), max_len=100)
 				event_desc   = _bi_html(event.get("description", ""), event.get("description_native"))
+				due_date     = (event.get("starts_on") or str(frappe.utils.today()))[:10]
+				title        = re.sub(r"<[^>]+>", "", f"{category}: {full_subject}").strip()[:140] or category
 				frappe.get_doc({
-					"doctype":            "Event",
-					"subject":            full_subject,
-					"event_category":     category,
-					"starts_on":          starts_on,
-					"description":        event_desc[:2000],
-					"status":             "Open",
-					"event_type":         "Private",
-					"reference_doctype":  "CRM Lead",
-					"reference_docname":  crm_lead_name,
-					"event_participants": [{
-						"reference_doctype": "CRM Lead",
-						"reference_docname": crm_lead_name,
-					}],
+					"doctype":           "CRM Task",
+					"title":             title,
+					"description":       event_desc[:2000],
+					"status":            "Todo",
+					"priority":          "Medium",
+					"due_date":          due_date,
+					"assigned_to":       scanned_by or frappe.session.user,
+					"reference_doctype": "CRM Lead",
+					"reference_docname": crm_lead_name,
 				}).insert(ignore_permissions=True)
 			if events:
 				frappe.db.commit()
 		except Exception:
-			frappe.log_error(f"NextIQ: CRM Events failed for {crm_lead_name}",
+			frappe.log_error(f"NextIQ: CRM Events→Task failed for {crm_lead_name}",
 				frappe.get_traceback())
 
 	finally:
@@ -1216,36 +1222,47 @@ def _send_feedback_to_service(log_name, feedback_type):
 # ── Email notification ────────────────────────────────────────────────────────
 
 def _send_scan_notification(log_name, outcome, lead_name=None, message=None, scans_remaining=None):
-	"""Send email to the ERPNext user who submitted the scan."""
+	"""Email the user who submitted the scan — only on failure outcomes.
+
+	Policy (kept deliberately narrow to avoid over-notifying):
+	  • Email on:  failed / processing_failed / suspended, invalid_data,
+	               not_a_business_card (invalid image), quota_exceeded.
+	  • Silent on: success, duplicate_lead.
+	Any outcome not present in NOTIFY sends nothing.
+	"""
+	NOTIFY = {
+		"failed":              ("[NextIQ] Card scan failed", "<p>Your card scan could not be completed.</p>"),
+		"processing_failed":   ("[NextIQ] Card scan failed", "<p>Your card scan could not be completed.</p>"),
+		"suspended":           ("[NextIQ] Card scan failed", "<p>Your card scan could not be completed.</p>"),
+		"invalid_data":        ("[NextIQ] Card scan could not be saved", "<p>The scanned details could not be saved as a lead.</p>"),
+		"not_a_business_card": ("[NextIQ] Image was not a business card", "<p>The image you submitted was not recognised as a business card.</p>"),
+		"quota_exceeded":      ("[NextIQ] Scan quota exhausted",
+			"<p>Your scan quota is exhausted. No more scans can be processed.</p>"
+			"<p>Please contact the NextIQ team to increase your quota.</p>"),
+	}
+
+	mail = NOTIFY.get(outcome)
+	if not mail:
+		return  # success, duplicate_lead, etc. — stay silent
+
 	try:
 		owner = frappe.db.get_value("Card Scan Log", log_name, "owner")
 		user_email = frappe.db.get_value("User", owner, "email")
 		if not user_email:
 			return
 
-		if outcome == "quota_exceeded":
-			frappe.sendmail(
-				recipients=[user_email],
-				subject="[NextIQ] Scan quota exhausted",
-				message=(
-					"<p>Your scan quota is exhausted. No more scans can be processed.</p>"
-					"<p>Please contact the NextIQ team to increase your quota.</p>"
-				),
-				delayed=False,
-			)
+		subject, body = mail
+		if outcome != "quota_exceeded":
+			if message:
+				body += f"<p><strong>Reason:</strong> {frappe.utils.escape_html(message)}</p>"
+			body += "<p>Please try scanning again.</p>"
 
-		elif outcome == "failed":
-			frappe.sendmail(
-				recipients=[user_email],
-				subject="[NextIQ] Card scan failed",
-				message=(
-					"<p>Your card scan could not be completed.</p>"
-					+ (f"<p><strong>Reason:</strong> {message}</p>" if message else "")
-					+ "<p>Please try scanning again.</p>"
-				),
-				delayed=False,
-			)
-
+		frappe.sendmail(
+			recipients=[user_email],
+			subject=subject,
+			message=body,
+			delayed=False,
+		)
 	except Exception:
 		frappe.log_error(
 			f"NextIQ: Email notification failed for {log_name}",
