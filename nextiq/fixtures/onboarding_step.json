@@ -1,0 +1,38 @@
+[
+ {
+  "doctype": "Onboarding Step",
+  "name": "NIQ Client - Scan a Card",
+  "title": "Scan your first business card",
+  "description": "Open the **Scan Portal** and scan a business card with your camera. NextIQ reads the card with AI and creates a Lead for you automatically.",
+  "action": "Go to Page",
+  "action_label": "Scan your first business card",
+  "path": "/card-scan",
+  "is_complete": 0,
+  "is_skipped": 0,
+  "docstatus": 0
+ },
+ {
+  "doctype": "Onboarding Step",
+  "name": "NIQ Client - Add Voice Note",
+  "title": "Add a voice note while scanning",
+  "description": "While scanning a card, tap the microphone to record a short voice note — e.g. what you discussed. NextIQ transcribes it and adds a summary straight to the Lead.",
+  "action": "Go to Page",
+  "action_label": "Add a voice note",
+  "path": "/card-scan",
+  "is_complete": 0,
+  "is_skipped": 0,
+  "docstatus": 0
+ },
+ {
+  "doctype": "Onboarding Step",
+  "name": "NIQ Client - Check Balance",
+  "title": "Check your scan balance",
+  "description": "Open **My Balance** to see how many scans you have remaining this cycle.",
+  "action": "Go to Page",
+  "action_label": "Check your scan balance",
+  "path": "/app/nextiq-balance",
+  "is_complete": 0,
+  "is_skipped": 0,
+  "docstatus": 0
+ }
+]

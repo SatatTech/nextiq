@@ -12,6 +12,14 @@ bench get-app $URL_OF_THIS_REPO --branch develop
 bench install-app nextiq
 ```
 
+### Getting Started
+
+New to NextIQ? See the full step-by-step guide with screenshots, covering both Frappe Cloud and self-hosted benches:
+
+**[NextIQ Installation & Connection Guide](https://nextiq.in/docs/nextiq-guidelines)**
+
+It walks through installing NextIQ, signing up for a NextIQ Service account, and connecting.
+
 ### Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
