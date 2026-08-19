@@ -1,14 +1,16 @@
-import nextiq
 import frappe
 import requests
 
+import nextiq
 from nextiq.oauth import _service_url
 
 
 def _version_lt(v1, v2):
 	"""Return True if semver v1 < v2. Ignores pre-release suffixes."""
+
 	def _parse(v):
 		return tuple(int(x) for x in v.lstrip("v").split("-")[0].split(".")[:3])
+
 	try:
 		return _parse(v1) < _parse(v2)
 	except Exception:
@@ -24,6 +26,7 @@ def check_service_version():
 	"""
 	try:
 		from nextiq.api import _get_service_auth_headers
+
 		try:
 			auth_headers = _get_service_auth_headers()
 		except Exception:
@@ -47,14 +50,18 @@ def check_service_version():
 			)
 			return
 
-		min_version  = data.get("min_client_version") or "0.0.1"
+		min_version = data.get("min_client_version") or "0.0.1"
 		needs_update = _version_lt(nextiq.__version__, min_version)
 
-		frappe.db.set_value("NextIQ Settings", "NextIQ Settings", {
-			"service_min_version":    min_version,
-			"needs_mandatory_update": 1 if needs_update else 0,
-			"version_last_checked":   frappe.utils.now_datetime(),
-		})
+		frappe.db.set_value(
+			"NextIQ Settings",
+			"NextIQ Settings",
+			{
+				"service_min_version": min_version,
+				"needs_mandatory_update": 1 if needs_update else 0,
+				"version_last_checked": frappe.utils.now_datetime(),
+			},
+		)
 		frappe.db.commit()
 		frappe.clear_document_cache("NextIQ Settings", "NextIQ Settings")
 		# Force all sessions to re-compute boot banner on next full page load
@@ -64,9 +71,9 @@ def check_service_version():
 			pass
 
 		return {
-			"mandatory":       needs_update,
+			"mandatory": needs_update,
 			"current_version": nextiq.__version__,
-			"min_version":     min_version,
+			"min_version": min_version,
 		}
 
 	except requests.exceptions.ConnectionError:

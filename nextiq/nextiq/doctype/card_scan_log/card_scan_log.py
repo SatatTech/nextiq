@@ -7,10 +7,20 @@ from frappe.model.document import Document
 # Fields written only by submit_card_scan() or scan_callback() via db.set_value.
 # Any attempt to change them through a normal form save is rejected.
 _SERVICE_FIELDS_BASE = (
-	"status", "submitted_at", "processed_at", "merged_image",
-	"voice_audio", "voice_audio_2", "voice_audio_3", "voice_language",
-	"lead", "scans_remaining", "error_message", "ai_response",
-	"job_id", "cb_secret",
+	"status",
+	"submitted_at",
+	"processed_at",
+	"merged_image",
+	"voice_audio",
+	"voice_audio_2",
+	"voice_audio_3",
+	"voice_language",
+	"lead",
+	"scans_remaining",
+	"error_message",
+	"ai_response",
+	"job_id",
+	"cb_secret",
 )
 
 
@@ -32,7 +42,8 @@ class CardScanLog(Document):
 		# this catches crafted API calls that bypass those layers.
 		svc = _service_fields()
 		stored = frappe.db.get_value(
-			"Card Scan Log", self.name,
+			"Card Scan Log",
+			self.name,
 			svc,
 			as_dict=True,
 		)
@@ -47,7 +58,6 @@ class CardScanLog(Document):
 				"NextIQ: Unauthorized Field Edit Attempt",
 			)
 			frappe.throw(
-				"Card Scan Log fields cannot be edited manually: "
-				+ ", ".join(changed),
+				"Card Scan Log fields cannot be edited manually: " + ", ".join(changed),
 				title="Not Allowed",
 			)
