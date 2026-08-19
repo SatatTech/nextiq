@@ -56,7 +56,12 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          # Frappe's version-16 branch pins requires-python to exactly
+          # >=3.14,<3.15 — anything older can't even parse its source
+          # (it uses PEP 695 `type X = ...` syntax, Python 3.12+ only).
+          # version-15 is more permissive (>=3.10,<3.15), so 3.14 covers
+          # both matrix legs.
+          python-version: "3.14"
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -97,6 +102,10 @@ jobs:
           bench build
         env:
           CI: "Yes"
+
+      - name: Ensure default Warehouse Type "Transit" exists
+        working-directory: /home/runner/frappe-bench
+        run: bench --site test_site console < $GITHUB_WORKSPACE/.github/ci/ensure_default_records.py
 
       - name: Run tests
         working-directory: /home/runner/frappe-bench
