@@ -16,18 +16,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # nextiq's own branches (main, dev-v2, prod, ...) don't map to Frappe
+  # version branches the way they do in apps that branch per-Frappe-version
+  # (e.g. a repo with its own "version-15" branch), so there's no branch
+  # name to derive a Frappe version from. Instead, derive the matrix from
+  # pyproject.toml's own [tool.bench.frappe-dependencies] range — that
+  # stays the single place declaring what nextiq supports, and now also
+  # what CI actually verifies, so the two can't quietly disagree.
+  prepare:
+    runs-on: ubuntu-latest
+    name: Compute Frappe version matrix
+    outputs:
+      frappe-versions: ${{ steps.compute.outputs.versions }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - id: compute
+        run: python3 .github/ci/compute_frappe_matrix.py >> "$GITHUB_OUTPUT"
+
   tests:
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # nextiq's own branches (main, dev-v2, prod, ...) don't map to
-        # Frappe version branches the way they do in apps that branch
-        # per-Frappe-version, so this is an explicit list rather than
-        # derived from the branch name. Matches what pyproject.toml
-        # declares support for (>=14.0.0,<17.0.0) — version-16 is current
-        # stable, version-15 is the previous stable still in wide use.
-        frappe-branch: [version-15, version-16]
+        frappe-branch: ${{ fromJson(needs.prepare.outputs.frappe-versions) }}
     name: Server (${{ matrix.frappe-branch }})
     env:
       FRAPPE_BRANCH: ${{ matrix.frappe-branch }}
