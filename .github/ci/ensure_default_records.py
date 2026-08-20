@@ -34,6 +34,20 @@
 # into Territory, a plain Link) so it already exists by the time anything
 # needs it through a Dynamic Link instead.
 #
+# frappe.tests.utils.make_test_records only exists on version-16 (a
+# package restructure) — frappe.test_runner.make_test_records is the
+# version-portable path: the real implementation on version-15, a
+# functional deprecated wrapper forwarding to the same place on
+# version-16. Also set the test-mode flags the real test runner always
+# sets before this point (frappe.local.flags.in_test and, on version-16,
+# frappe.in_test) — without them, code paths that check "are we in a
+# test?" behave as if this were production, e.g. User.validate() runs
+# full password-strength enforcement instead of skipping it, which broke
+# ERPNext's own test bootstrap (erpnext.tests.utils.BootStrapTestData,
+# imported as a side effect of loading Lead's test module) trying to
+# create its standard test user with a deliberately weak placeholder
+# password.
+#
 # Plain script rather than `bench execute`: that command resolves dotted
 # paths through frappe.get_attr(), which requires the first segment to be
 # a real *installed app name*, not just an importable module on
@@ -52,6 +66,8 @@ site = sys.argv[1]
 os.chdir("sites")
 frappe.init(site=site)
 frappe.connect()
+frappe.local.flags.in_test = True
+frappe.in_test = True  # version-16 only; harmless to set unconditionally on version-15
 
 from erpnext.setup.setup_wizard.operations.install_fixtures import install as install_erpnext_fixtures
 from frappe.desk.page.setup_wizard.install_fixtures import install as install_frappe_fixtures
@@ -63,7 +79,7 @@ install_frappe_fixtures()
 # The value itself doesn't matter for CI seed data — just needs to be real.
 install_erpnext_fixtures(country="India")
 
-from frappe.tests.utils import make_test_records
+from frappe.test_runner import make_test_records
 
 make_test_records("Lead", commit=True)
 
