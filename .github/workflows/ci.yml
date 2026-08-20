@@ -114,7 +114,7 @@ jobs:
         env:
           CI: "Yes"
 
-      - name: Ensure default Warehouse Type "Transit" exists
+      - name: Seed missing ERPNext default fixtures
         working-directory: /home/runner/frappe-bench
         # Neither `bench console` (interactive REPL, doesn't reliably run a
         # piped-in script) nor `bench execute` (resolves dotted paths via
