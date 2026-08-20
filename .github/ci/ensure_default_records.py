@@ -84,31 +84,36 @@ install_frappe_fixtures()
 # The value itself doesn't matter for CI seed data — just needs to be real.
 install_erpnext_fixtures(country="India")
 
-territory = frappe.get_doc(
-	{
-		"doctype": "Territory",
-		"territory_name": "_Test Territory",
-		"parent_territory": "All Territories",
-		"is_group": 0,
-	}
-)
-territory.insert(ignore_permissions=True, ignore_if_duplicate=True)
 
-# naming_series mirrors exactly what Frappe's own test-record machinery
-# does for a doctype named via naming_series (frappe/tests/utils/
-# generators.py's _try_create): the counter then assigns "_T-Lead-00001"
-# on a fresh site, matching what Opportunity's fixture hardcodes.
-lead = frappe.get_doc(
-	{
-		"doctype": "Lead",
-		"email_id": "test_lead@example.com",
-		"lead_name": "_Test Lead",
-		"status": "Open",
-		"territory": "_Test Territory",
-	}
-)
-lead.naming_series = "_T-Lead-"
-lead.insert(ignore_permissions=True, ignore_if_duplicate=True)
+def create_opportunity_test_dependencies():
+	territory = frappe.get_doc(
+		{
+			"doctype": "Territory",
+			"territory_name": "_Test Territory",
+			"parent_territory": "All Territories",
+			"is_group": 0,
+		}
+	)
+	territory.insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+	# naming_series mirrors exactly what Frappe's own test-record machinery
+	# does for a doctype named via naming_series (frappe/tests/utils/
+	# generators.py's _try_create): the counter then assigns "_T-Lead-00001"
+	# on a fresh site, matching what Opportunity's fixture hardcodes.
+	lead = frappe.get_doc(
+		{
+			"doctype": "Lead",
+			"email_id": "test_lead@example.com",
+			"lead_name": "_Test Lead",
+			"status": "Open",
+			"territory": "_Test Territory",
+		}
+	)
+	lead.naming_series = "_T-Lead-"
+	lead.insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+
+create_opportunity_test_dependencies()
 
 # Standalone CI script, outside any request/transaction context.
 frappe.db.commit()  # nosemgrep
