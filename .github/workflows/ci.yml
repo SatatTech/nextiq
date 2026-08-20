@@ -46,17 +46,6 @@ jobs:
       matrix:
         frappe-branch: ${{ fromJson(needs.prepare.outputs.frappe-versions) }}
     name: Server (${{ matrix.frappe-branch }})
-    # version-15 only: bench init/install and the fixture-seeding script are
-    # required to pass, but bench run-tests --app nextiq is not — Frappe's
-    # test framework does exhaustive transitive dependency resolution for
-    # any Link field (here, Card Scan Log.lead -> Lead), which on this
-    # codebase's actual graph touches 85+ ERPNext doctypes having nothing
-    # to do with nextiq, and hits a genuine ERPNext version-15 test-fixture
-    # bug partway through (an auto-generated Opportunity test record
-    # missing a mandatory "company" field) — confirmed against a real,
-    # fresh version-15 bench, not a guess. Not a nextiq issue, and not
-    # something bounded/fixable by pre-seeding more records.
-    continue-on-error: ${{ matrix.frappe-branch == 'version-15' }}
     env:
       FRAPPE_BRANCH: ${{ matrix.frappe-branch }}
 
@@ -153,6 +142,18 @@ jobs:
 
       - name: Run tests
         working-directory: /home/runner/frappe-bench
+        # version-15 only: this step (and only this step — bench init/install
+        # and the fixture-seeding script above are still required to pass) is
+        # allowed to fail. Frappe's test framework does exhaustive transitive
+        # dependency resolution for any Link field (here, Card Scan Log.lead
+        # -> Lead), which on this codebase's actual graph touches 85+ ERPNext
+        # doctypes having nothing to do with nextiq, and hits a genuine
+        # ERPNext version-15 test-fixture bug partway through (an
+        # auto-generated Opportunity test record missing a mandatory
+        # "company" field) — confirmed against a real, fresh version-15
+        # bench, not a guess. Not a nextiq issue, and not something
+        # bounded/fixable by pre-seeding more records.
+        continue-on-error: ${{ matrix.frappe-branch == 'version-15' }}
         run: |
           bench --site test_site set-config allow_tests true
           bench --site test_site run-tests --app nextiq
