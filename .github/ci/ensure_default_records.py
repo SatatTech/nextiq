@@ -25,28 +25,29 @@
 # data already exists (e.g. on version-16, where it's normally fine
 # already).
 #
-# Separately: Frappe's test runner reliably auto-creates dependencies for
-# plain Link fields (e.g. Lead.territory -> Territory), but not reliably
-# for Dynamic Link fields — e.g. Opportunity's test record references a
-# test Lead ("_T-Lead-00001") through a Dynamic Link, and on version-15
-# that Lead was never created first, so the reference fails to resolve.
-# Pre-create Lead's own test records directly (which correctly cascades
-# into Territory, a plain Link) so it already exists by the time anything
-# needs it through a Dynamic Link instead.
+# frappe.local.flags.in_test (and, on version-16, frappe.in_test) are set
+# below because the real bench run-tests always sets them before this
+# point is reached, and some validations key off them directly (e.g.
+# User.validate() only skips password-strength enforcement when
+# frappe.in_test is set) — without it, this script behaves as if it were
+# production, not test setup.
 #
-# frappe.tests.utils.make_test_records only exists on version-16 (a
-# package restructure) — frappe.test_runner.make_test_records is the
-# version-portable path: the real implementation on version-15, a
-# functional deprecated wrapper forwarding to the same place on
-# version-16. Also set the test-mode flags the real test runner always
-# sets before this point (frappe.local.flags.in_test and, on version-16,
-# frappe.in_test) — without them, code paths that check "are we in a
-# test?" behave as if this were production, e.g. User.validate() runs
-# full password-strength enforcement instead of skipping it, which broke
-# ERPNext's own test bootstrap (erpnext.tests.utils.BootStrapTestData,
-# imported as a side effect of loading Lead's test module) trying to
-# create its standard test user with a deliberately weak placeholder
-# password.
+# NOTE: an earlier version of this script also called
+# frappe.test_runner.make_test_records("Lead", commit=True) here, to
+# pre-create a Lead that erpnext/crm/doctype/opportunity/test_records.json
+# references by hardcoded name through a Dynamic Link field ("Party") —
+# Dynamic Links aren't reliably auto-walked as dependencies the way plain
+# Link fields are, so that Lead was never created before something needed
+# it. That fix was reverted: make_test_records() recursively walks
+# Frappe's *entire* test dependency graph from the given doctype, not just
+# its immediate needs — confirmed via traceback showing 22+ levels of
+# recursion — and on this codebase's actual dependency graph that walk
+# hits both a missing mandatory field on an auto-generated Opportunity
+# test record and, worse, a doctype ("Payment Gateway") belonging to an
+# app that isn't even installed here ("payments"). Each attempt to work
+# around that made things worse, not better, so the Dynamic Link gap is
+# left as a known, accepted limitation on version-15 rather than chased
+# further.
 #
 # Plain script rather than `bench execute`: that command resolves dotted
 # paths through frappe.get_attr(), which requires the first segment to be
@@ -78,10 +79,6 @@ install_frappe_fixtures()
 # unconditionally to build a home-country Territory and Address Template.
 # The value itself doesn't matter for CI seed data — just needs to be real.
 install_erpnext_fixtures(country="India")
-
-from frappe.test_runner import make_test_records
-
-make_test_records("Lead", commit=True)
 
 # Standalone CI script, outside any request/transaction context.
 frappe.db.commit()  # nosemgrep
