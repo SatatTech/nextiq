@@ -32,22 +32,26 @@
 # frappe.in_test is set) — without it, this script behaves as if it were
 # production, not test setup.
 #
-# NOTE: an earlier version of this script also called
-# frappe.test_runner.make_test_records("Lead", commit=True) here, to
-# pre-create a Lead that erpnext/crm/doctype/opportunity/test_records.json
-# references by hardcoded name through a Dynamic Link field ("Party") —
-# Dynamic Links aren't reliably auto-walked as dependencies the way plain
-# Link fields are, so that Lead was never created before something needed
-# it. That fix was reverted: make_test_records() recursively walks
-# Frappe's *entire* test dependency graph from the given doctype, not just
-# its immediate needs — confirmed via traceback showing 22+ levels of
-# recursion — and on this codebase's actual dependency graph that walk
-# hits both a missing mandatory field on an auto-generated Opportunity
-# test record and, worse, a doctype ("Payment Gateway") belonging to an
-# app that isn't even installed here ("payments"). Each attempt to work
-# around that made things worse, not better, so the Dynamic Link gap is
-# left as a known, accepted limitation on version-15 rather than chased
-# further.
+# version-15 only: erpnext/crm/doctype/opportunity/test_records.json
+# references a Lead by hardcoded name ("_T-Lead-00001") through a Dynamic
+# Link field ("Party") — Dynamic Links aren't reliably auto-walked as
+# dependencies the way plain Link fields are, so that Lead is never
+# created before something needs it. An earlier attempt used
+# frappe.test_runner.make_test_records("Lead", commit=True) to pre-create
+# it, but that recursively walks Frappe's *entire* test dependency graph
+# from the given doctype (confirmed via a 22+-level-deep traceback), and
+# on this codebase's actual graph that walk hit both a missing mandatory
+# field on an auto-generated Opportunity test record and a doctype
+# ("Payment Gateway") belonging to an app that isn't even installed here
+# ("payments") — worse than the original problem.
+#
+# So instead: create exactly the two records needed, directly, matching
+# the real field values from Territory's and Lead's own test_records.json
+# (confirmed against frappe/erpnext's actual version-15 branch source) —
+# no graph-walking at all. Confirmed version-16 has no equivalent
+# Opportunity/Territory test fixtures referencing a Lead this way, so
+# these two extra records are a genuine no-op there, not a
+# version-conditional hack.
 #
 # Plain script rather than `bench execute`: that command resolves dotted
 # paths through frappe.get_attr(), which requires the first segment to be
@@ -79,6 +83,32 @@ install_frappe_fixtures()
 # unconditionally to build a home-country Territory and Address Template.
 # The value itself doesn't matter for CI seed data — just needs to be real.
 install_erpnext_fixtures(country="India")
+
+territory = frappe.get_doc(
+	{
+		"doctype": "Territory",
+		"territory_name": "_Test Territory",
+		"parent_territory": "All Territories",
+		"is_group": 0,
+	}
+)
+territory.insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+# naming_series mirrors exactly what Frappe's own test-record machinery
+# does for a doctype named via naming_series (frappe/tests/utils/
+# generators.py's _try_create): the counter then assigns "_T-Lead-00001"
+# on a fresh site, matching what Opportunity's fixture hardcodes.
+lead = frappe.get_doc(
+	{
+		"doctype": "Lead",
+		"email_id": "test_lead@example.com",
+		"lead_name": "_Test Lead",
+		"status": "Open",
+		"territory": "_Test Territory",
+	}
+)
+lead.naming_series = "_T-Lead-"
+lead.insert(ignore_permissions=True, ignore_if_duplicate=True)
 
 # Standalone CI script, outside any request/transaction context.
 frappe.db.commit()  # nosemgrep
