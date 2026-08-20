@@ -25,6 +25,15 @@
 # data already exists (e.g. on version-16, where it's normally fine
 # already).
 #
+# Separately: Frappe's test runner reliably auto-creates dependencies for
+# plain Link fields (e.g. Lead.territory -> Territory), but not reliably
+# for Dynamic Link fields — e.g. Opportunity's test record references a
+# test Lead ("_T-Lead-00001") through a Dynamic Link, and on version-15
+# that Lead was never created first, so the reference fails to resolve.
+# Pre-create Lead's own test records directly (which correctly cascades
+# into Territory, a plain Link) so it already exists by the time anything
+# needs it through a Dynamic Link instead.
+#
 # Plain script rather than `bench execute`: that command resolves dotted
 # paths through frappe.get_attr(), which requires the first segment to be
 # a real *installed app name*, not just an importable module on
@@ -53,6 +62,11 @@ install_frappe_fixtures()
 # unconditionally to build a home-country Territory and Address Template.
 # The value itself doesn't matter for CI seed data — just needs to be real.
 install_erpnext_fixtures(country="India")
+
+from frappe.tests.utils import make_test_records
+
+make_test_records("Lead", commit=True)
+
 # Standalone CI script, outside any request/transaction context.
 frappe.db.commit()  # nosemgrep
 frappe.destroy()
