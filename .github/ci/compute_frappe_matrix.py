@@ -14,7 +14,9 @@ import sys
 
 import tomllib
 
-with open("pyproject.toml", "rb") as f:
+# Hardcoded literal path, not a variable — no user input reaches this,
+# so there's nothing to traverse.
+with open("pyproject.toml", "rb") as f:  # nosemgrep
 	data = tomllib.load(f)
 
 constraint = data["tool"]["bench"]["frappe-dependencies"]["frappe"]
