@@ -2,25 +2,28 @@
 # (from the bench root — see ci.yml)
 #
 # CI-only test-environment setup, not part of nextiq itself: Frappe's test
-# runner auto-creates a test Company record for any app under test once
-# erpnext is installed, which cascades into ERPNext code that expects a
-# set of standard root/default records to already exist — "Warehouse
-# Type: Transit", "Customer Group: All Customer Groups", "Territory: All
-# Territories", "Item Group: All Item Groups", and others in the same
-# family. Those are normally created by ERPNext's own Setup Wizard, which
-# the test runner never runs — it inserts a bare test Company directly.
-# On some version-15 point releases this same gap has also been reported
-# as a real bug users hit through the Setup Wizard UI itself (e.g.
-# frappe/erpnext#42309, #43261, #43262, #28928), so it isn't purely a
-# test-runner quirk either way — none of it is a nextiq issue.
+# runner auto-creates test records (Company, Contact, ...) for any app
+# under test once erpnext is installed, which cascades into code that
+# expects a whole set of standard default records to already exist —
+# "Warehouse Type: Transit", "Customer Group: All Customer Groups",
+# "Gender: Female", and others in the same family, from both Frappe core
+# and ERPNext. All of these are normally created together when a real
+# user completes the Setup Wizard, which the test runner never runs — it
+# inserts bare test records directly. On some version-15 point releases
+# this same gap has also been reported as a real bug users hit through
+# the Setup Wizard UI itself (e.g. frappe/erpnext#42309, #43261, #43262,
+# #28928), so it isn't purely a test-runner quirk either way — none of it
+# is a nextiq issue.
 #
 # Rather than recreate each individual missing record by hand as they
-# turn up one at a time, call the actual function ERPNext itself uses to
-# seed all of them: erpnext.setup.setup_wizard.operations.install_fixtures
-# .install(). Every record it creates goes through insert(..., ignore_if_
-# duplicate=True) wrapped in its own savepoint/rollback, so it's safe to
-# call even when some of this data already exists (e.g. on version-16,
-# where it's normally fine already).
+# turn up one at a time, call the same two functions the real Setup
+# Wizard calls, in the same order (frappe.desk.page.setup_wizard.
+# setup_wizard.run_post_setup_complete): Frappe core's own fixtures
+# first, then ERPNext's. Every record either one creates goes through
+# insert(..., ignore_if_duplicate=True), most wrapped in their own
+# savepoint/rollback, so both are safe to call even when some of this
+# data already exists (e.g. on version-16, where it's normally fine
+# already).
 #
 # Plain script rather than `bench execute`: that command resolves dotted
 # paths through frappe.get_attr(), which requires the first segment to be
@@ -42,6 +45,9 @@ frappe.init(site=site)
 frappe.connect()
 
 from erpnext.setup.setup_wizard.operations.install_fixtures import install as install_erpnext_fixtures
+from frappe.desk.page.setup_wizard.install_fixtures import install as install_frappe_fixtures
+
+install_frappe_fixtures()
 
 # country isn't optional despite the default: get_preset_records() uses it
 # unconditionally to build a home-country Territory and Address Template.
