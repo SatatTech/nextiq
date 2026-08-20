@@ -21,7 +21,7 @@ import sys
 import frappe
 
 site = sys.argv[1]
-frappe.init(site=site)
+frappe.init(site=site, sites_path="sites")
 frappe.connect()
 if not frappe.db.exists("Warehouse Type", "Transit"):
 	frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
