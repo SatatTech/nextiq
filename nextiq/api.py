@@ -12,6 +12,7 @@ import traceback
 
 import frappe
 import requests
+from frappe import _
 
 import nextiq
 from nextiq.oauth import _service_url
@@ -501,7 +502,12 @@ def _rate_limit(key, max_per_minute):
 
 
 @frappe.whitelist()
-def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=None, voice_clips=None):
+def submit_card_scan(
+	merged_image_base64: str,
+	filename: str = "business_card.jpg",
+	notes: str | None = None,
+	voice_clips: str | list | None = None,
+):
 	"""
 	Receive merged business card image + optional voice clips from the portal.
 	voice_clips: JSON array of {base64, mime} objects (up to 3).
@@ -510,7 +516,7 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	Returns immediately: {"log_name": str}
 	"""
 	# Block if the installed app is below the service-required minimum version
-	_service_min = frappe.db.get_value("NextIQ Settings", "NextIQ Settings", "service_min_version") or ""
+	_service_min = frappe.db.get_single_value("NextIQ Settings", "service_min_version") or ""
 	if _service_min and _version_lt(nextiq.__version__, _service_min):
 		frappe.throw(
 			"The NextIQ app on this site requires an update before scanning can continue. "
@@ -639,18 +645,19 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	return {"log_name": log.name}
 
 
-@frappe.whitelist(allow_guest=True)
+# Server-to-server webhook — see the Security section in the docstring below for the auth model.
+@frappe.whitelist(allow_guest=True)  # nosemgrep
 def scan_callback(
-	job_id,
-	cb_secret,
-	success,
-	data=None,
-	error=None,
-	message=None,
-	scans_used=None,
-	scans_allowed=None,
-	scans_remaining=None,
-	voice_notes=None,
+	job_id: str,
+	cb_secret: str,
+	success: bool | str,
+	data: dict | None = None,
+	error: str | None = None,
+	message: str | None = None,
+	scans_used: int | None = None,
+	scans_allowed: int | None = None,
+	scans_remaining: int | None = None,
+	voice_notes: dict | None = None,
 ):
 	"""
 	Called by nextiq_service when scan processing is complete.
@@ -723,9 +730,7 @@ def scan_callback(
 				if k in _ALLOWED_LEAD_FIELDS and v not in (None, "")
 			}
 		if data:
-			destination = (
-				frappe.db.get_value("NextIQ Settings", "NextIQ Settings", "lead_destination") or "ERPNext"
-			)
+			destination = frappe.db.get_single_value("NextIQ Settings", "lead_destination") or "ERPNext"
 			installed = frappe.get_installed_apps()
 			make_erpnext = destination in ("ERPNext", "Both") and "erpnext" in installed
 			make_crm = destination in ("Frappe CRM", "Both") and "crm" in installed
@@ -1521,13 +1526,17 @@ def get_live_balance():
 			timeout=10,
 		)
 	except requests.exceptions.ConnectionError:
-		frappe.throw(f"Cannot reach NextIQ Service at {service_url}.", title="Connection Error")
+		frappe.throw(
+			_("Cannot reach NextIQ Service at {0}.").format(service_url), title=_("Connection Error")
+		)
 	except requests.exceptions.Timeout:
-		frappe.throw("NextIQ Service did not respond in time.", title="Timeout")
+		frappe.throw(_("NextIQ Service did not respond in time."), title=_("Timeout"))
 
 	if resp.status_code == 429:
-		frappe.throw("Balance check rate limit reached. Please wait a moment.", title="Rate Limited")
+		frappe.throw(_("Balance check rate limit reached. Please wait a moment."), title=_("Rate Limited"))
 	if resp.status_code >= 400:
-		frappe.throw(f"NextIQ Service returned error {resp.status_code}.", title="Service Error")
+		frappe.throw(
+			_("NextIQ Service returned error {0}.").format(resp.status_code), title=_("Service Error")
+		)
 
 	return resp.json().get("message", {})

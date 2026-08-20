@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 
 from nextiq.api import get_live_balance
 
@@ -41,10 +42,10 @@ def execute(filters=None):
 	to_date = filters.get("to_date")
 
 	columns = [
-		{"fieldname": "group", "label": "Group", "fieldtype": "Data", "width": 130},
-		{"fieldname": "status", "label": "Status", "fieldtype": "Data", "width": 150},
-		{"fieldname": "count", "label": "Scans", "fieldtype": "Int", "width": 100},
-		{"fieldname": "charged", "label": "Charged?", "fieldtype": "Data", "width": 100},
+		{"fieldname": "group", "label": _("Group"), "fieldtype": "Data", "width": 130},
+		{"fieldname": "status", "label": _("Status"), "fieldtype": "Data", "width": 150},
+		{"fieldname": "count", "label": _("Scans"), "fieldtype": "Int", "width": 100},
+		{"fieldname": "charged", "label": _("Charged?"), "fieldtype": "Data", "width": 100},
 	]
 
 	# ── Counts by status ──────────────────────────────────────────────────────

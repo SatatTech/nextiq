@@ -116,12 +116,12 @@ jobs:
 
       - name: Ensure default Warehouse Type "Transit" exists
         working-directory: /home/runner/frappe-bench
-        # bench console is an interactive REPL and doesn't reliably run a
-        # piped-in script; bench execute imports and calls a real function,
-        # so put .github/ci/ on PYTHONPATH and call it directly.
-        run: bench --site test_site execute ensure_default_records.ensure_transit_warehouse_type
-        env:
-          PYTHONPATH: ${{ github.workspace }}/.github/ci
+        # Neither `bench console` (interactive REPL, doesn't reliably run a
+        # piped-in script) nor `bench execute` (resolves dotted paths via
+        # frappe.get_attr, which requires an installed app name, not just an
+        # importable module) can run a standalone script. env/bin/python can
+        # call frappe.init()/connect() directly, same as any Frappe script.
+        run: env/bin/python "$GITHUB_WORKSPACE/.github/ci/ensure_default_records.py" test_site
 
       - name: Run tests
         working-directory: /home/runner/frappe-bench

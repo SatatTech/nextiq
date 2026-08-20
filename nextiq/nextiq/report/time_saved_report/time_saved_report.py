@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import add_days, add_months, today
 
 # Daily/Weekly → line (many points, trend matters)
@@ -11,13 +12,17 @@ _CHART_TYPE = {
 	"Yearly": "bar",
 }
 
-_COL_LABEL = {
-	"Daily": "Date",
-	"Weekly": "Week",
-	"Monthly": "Month",
-	"Quarterly": "Quarter",
-	"Yearly": "Year",
-}
+
+def _col_label(period):
+	# A function, not a module-level dict: _() must be evaluated per-request
+	# (site/user language), not cached once at import time.
+	return {
+		"Daily": _("Date"),
+		"Weekly": _("Week"),
+		"Monthly": _("Month"),
+		"Quarterly": _("Quarter"),
+		"Yearly": _("Year"),
+	}.get(period, _("Period"))
 
 
 def execute(filters=None):
@@ -34,12 +39,12 @@ def execute(filters=None):
 	columns = [
 		{
 			"fieldname": "period_label",
-			"label": _COL_LABEL.get(period, "Period"),
+			"label": _col_label(period),
 			"fieldtype": "Data",
 			"width": 140,
 		},
-		{"fieldname": "leads_created", "label": "Leads Created", "fieldtype": "Int", "width": 140},
-		{"fieldname": "minutes_saved", "label": "Time Saved (mins)", "fieldtype": "Int", "width": 160},
+		{"fieldname": "leads_created", "label": _("Leads Created"), "fieldtype": "Int", "width": 140},
+		{"fieldname": "minutes_saved", "label": _("Time Saved (mins)"), "fieldtype": "Int", "width": 160},
 	]
 
 	rows = _fetch_rows(period, from_date, to_date)

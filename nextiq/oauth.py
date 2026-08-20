@@ -91,7 +91,7 @@ def _verify_state(state):
 
 
 @frappe.whitelist()
-def begin_oauth(site):
+def begin_oauth(site: str):
 	"""
 	Entry point for the Connect flow.
 	1. Calls nextiq_service to get/create an OAuth Client for this site (dynamic).
@@ -169,8 +169,11 @@ def get_connect_config():
 # ── OAuth callback ────────────────────────────────────────────────────────────
 
 
-@frappe.whitelist(allow_guest=True)
-def callback(code=None, state=None, error=None):
+# OAuth redirect target, hit before any session exists — signed state (HMAC) +
+# single-use Redis-cached PKCE verifier + constant-time comparisons below are
+# the actual auth boundary, not a Frappe session.
+@frappe.whitelist(allow_guest=True)  # nosemgrep
+def callback(code: str | None = None, state: str | None = None, error: str | None = None):
 	if error:
 		frappe.log_error("nextiq_oauth_callback", f"OAuth callback error param: {error}")
 		frappe.respond_as_web_page(

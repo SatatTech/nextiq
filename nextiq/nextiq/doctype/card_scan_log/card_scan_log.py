@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 
 # Fields written only by submit_card_scan() or scan_callback() via db.set_value.
@@ -58,6 +59,6 @@ class CardScanLog(Document):
 				"NextIQ: Unauthorized Field Edit Attempt",
 			)
 			frappe.throw(
-				"Card Scan Log fields cannot be edited manually: " + ", ".join(changed),
-				title="Not Allowed",
+				_("Card Scan Log fields cannot be edited manually: {0}").format(", ".join(changed)),
+				title=_("Not Allowed"),
 			)
