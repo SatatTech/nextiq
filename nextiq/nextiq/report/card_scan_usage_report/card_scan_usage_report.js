@@ -38,9 +38,12 @@ frappe.query_reports["Card Scan Usage Report"] = {
 					const pct = d.scans_allowed
 						? ((d.scans_used / d.scans_allowed) * 100).toFixed(1)
 						: 0;
-					const indicator = d.scans_remaining === 0 ? "red"
-						: d.scans_remaining < d.scans_allowed * 0.2 ? "orange"
-						: "green";
+					const indicator =
+						d.scans_remaining === 0
+							? "red"
+							: d.scans_remaining < d.scans_allowed * 0.2
+							? "orange"
+							: "green";
 					frappe.msgprint({
 						title: __("Live Scan Balance"),
 						indicator,
@@ -48,7 +51,13 @@ frappe.query_reports["Card Scan Usage Report"] = {
 							<table class="table table-bordered table-sm" style="margin-top:8px">
 								<tr><th>${__("Total Allocated")}</th><td><strong>${d.scans_allowed}</strong></td></tr>
 								<tr><th>${__("Scans Used")}</th><td>${d.scans_used} (${pct}%)</td></tr>
-								<tr class="${indicator === 'green' ? 'table-success' : indicator === 'orange' ? 'table-warning' : 'table-danger'}">
+								<tr class="${
+									indicator === "green"
+										? "table-success"
+										: indicator === "orange"
+										? "table-warning"
+										: "table-danger"
+								}">
 									<th>${__("Remaining Balance")}</th>
 									<td><strong>${d.scans_remaining}</strong></td>
 								</tr>

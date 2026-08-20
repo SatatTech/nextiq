@@ -58,5 +58,10 @@ docstring-code-format = true
 # Declares the Frappe major version this app is compatible with. Frappe Cloud
 # reads this to pick a matching Frappe build; without it the deploy fails with
 # "Could not find compatible Frappe version in pyproject.toml file."
+#
+# This range is also the single source of truth for ci.yml's test matrix
+# (.github/ci/compute_frappe_matrix.py parses it) — every version claimed
+# here is a version CI actually verifies, and nothing more. Widening it
+# means CI will start testing that version too, not just claiming it.
 [tool.bench.frappe-dependencies]
-frappe = ">=14.0.0,<17.0.0"
+frappe = ">=15.0.0,<17.0.0"

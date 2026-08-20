@@ -22,15 +22,17 @@ nextiq._show_banner = function (info) {
 		<strong>NextIQ Update Required</strong>
 		&nbsp;
 		v${info.min_version} required, v${info.current_version} installed. Please update the NextIQ app.
-	</div>`).css({
-		background:   "#fff3cd",
-		borderBottom: "1px solid #e8a838",
-		padding:      "7px 20px",
-		textAlign:    "center",
-		fontSize:     "13px",
-		lineHeight:   "1.5",
-		zIndex:       "1050",
-	}).insertBefore(".navbar");
+	</div>`)
+		.css({
+			background: "#fff3cd",
+			borderBottom: "1px solid #e8a838",
+			padding: "7px 20px",
+			textAlign: "center",
+			fontSize: "13px",
+			lineHeight: "1.5",
+			zIndex: "1050",
+		})
+		.insertBefore(".navbar");
 };
 
 nextiq._hide_banner = function () {

@@ -12,11 +12,11 @@ import traceback
 
 import frappe
 import requests
+from frappe import _
 
 import nextiq
 from nextiq.oauth import _service_url
 from nextiq.version_check import _version_lt
-
 
 # ── OAuth token helpers ───────────────────────────────────────────────────────
 
@@ -28,21 +28,23 @@ def _token_valid(settings):
 		return False
 	if not settings.token_expires_at:
 		return False
-	return (frappe.utils.get_datetime(settings.token_expires_at)
-	        > frappe.utils.add_to_date(frappe.utils.now_datetime(), seconds=60))
+	return frappe.utils.get_datetime(settings.token_expires_at) > frappe.utils.add_to_date(
+		frappe.utils.now_datetime(), seconds=60
+	)
 
 
 def _do_refresh(settings):
 	"""Exchange refresh_token for a new access_token and persist it."""
 	import time as _time
+
 	refresh_token = settings.get_password("oauth_refresh_token")
-	client_id     = settings.oauth_client_id or frappe.conf.get("nextiq_oauth_client_id", "")
+	client_id = settings.oauth_client_id or frappe.conf.get("nextiq_oauth_client_id", "")
 	resp = requests.post(
 		f"{_service_url()}/api/method/frappe.integrations.oauth2.get_token",
 		data={
-			"grant_type":    "refresh_token",
+			"grant_type": "refresh_token",
 			"refresh_token": refresh_token,
-			"client_id":     client_id,
+			"client_id": client_id,
 		},
 		timeout=10,
 	)
@@ -54,9 +56,7 @@ def _do_refresh(settings):
 	s.oauth_access_token = tokens["access_token"]
 	if tokens.get("refresh_token"):
 		s.oauth_refresh_token = tokens["refresh_token"]
-	s.token_expires_at = frappe.utils.add_to_date(
-		None, seconds=int(tokens.get("expires_in", 3600))
-	)
+	s.token_expires_at = frappe.utils.add_to_date(None, seconds=int(tokens.get("expires_in", 3600)))
 	s.save(ignore_permissions=True)
 	frappe.db.commit()
 	return tokens["access_token"]
@@ -65,6 +65,7 @@ def _do_refresh(settings):
 def _get_valid_access_token():
 	"""Return a valid Bearer access token, refreshing if within 60 s of expiry."""
 	import time as _time
+
 	settings = frappe.get_single("NextIQ Settings")
 	if settings.connection_status != "Connected" or not settings.oauth_access_token:
 		frappe.throw(
@@ -93,7 +94,9 @@ def _get_valid_access_token():
 			s.save(ignore_permissions=True)
 			frappe.db.commit()
 		except Exception:
-			frappe.log_error("NextIQ: Failed to update connection_status after refresh failure", frappe.get_traceback())
+			frappe.log_error(
+				"NextIQ: Failed to update connection_status after refresh failure", frappe.get_traceback()
+			)
 		frappe.throw(
 			"OAuth token expired and refresh failed. Please reconnect via NextIQ Settings.",
 			title="Token Refresh Failed",
@@ -122,16 +125,28 @@ def _get_service_auth_headers():
 
 
 # Fields allowed when creating a Lead from scan data — mirrors the service-side list
-_ALLOWED_LEAD_FIELDS = frozenset({
-	"salutation", "first_name", "middle_name", "last_name",
-	"gender", "job_title", "email_id", "mobile_no", "whatsapp_no",
-	"phone", "phone_ext", "company_name", "website",
-	"fax",
-})
+_ALLOWED_LEAD_FIELDS = frozenset(
+	{
+		"salutation",
+		"first_name",
+		"middle_name",
+		"last_name",
+		"gender",
+		"job_title",
+		"email_id",
+		"mobile_no",
+		"whatsapp_no",
+		"phone",
+		"phone_ext",
+		"company_name",
+		"website",
+		"fax",
+	}
+)
 
 # Address fields are stored in Address doctype (linked to Lead), not on Lead itself
 _ADDRESS_FIELDS = frozenset({"address_line1", "address_line2", "city", "state", "pincode", "country"})
-_MAX_FIELD_LEN = 500   # max characters per Lead field value
+_MAX_FIELD_LEN = 500  # max characters per Lead field value
 
 # CRM Lead uses different field names for 2 fields; 3 fields don't exist in CRM Lead at all
 _CRM_FIELD_REMAP = {"email_id": "email", "company_name": "organization"}
@@ -140,42 +155,42 @@ _CRM_DROP_FIELDS = frozenset({"whatsapp_no", "phone_ext", "fax"})
 # Map Frappe DocType names (as they appear in "Could not find X: Y" errors) to
 # the Lead field name, so _find_bad_field can strip the offending field.
 _LINK_DOCTYPE_TO_FIELD = {
-	"country":    "country",
+	"country": "country",
 	"salutation": "salutation",
-	"Country":    "country",
+	"Country": "country",
 	"Salutation": "salutation",
 }
 
 # Maps lowercase field labels (as Frappe uses them in error messages) to Lead field names.
 # Lets _find_bad_field identify any field from a ValidationError, not just link fields.
 _FIELD_LABEL_TO_NAME = {
-	"salutation":   "salutation",
-	"first name":   "first_name",
-	"middle name":  "middle_name",
-	"last name":    "last_name",
-	"gender":       "gender",
-	"job title":    "job_title",
-	"email id":     "email_id",
-	"email":        "email_id",
-	"mobile no":    "mobile_no",
-	"mobile":       "mobile_no",
-	"whatsapp no":  "whatsapp_no",
-	"whatsapp":     "whatsapp_no",
-	"phone":        "phone",
-	"phone ext":    "phone_ext",
+	"salutation": "salutation",
+	"first name": "first_name",
+	"middle name": "middle_name",
+	"last name": "last_name",
+	"gender": "gender",
+	"job title": "job_title",
+	"email id": "email_id",
+	"email": "email_id",
+	"mobile no": "mobile_no",
+	"mobile": "mobile_no",
+	"whatsapp no": "whatsapp_no",
+	"whatsapp": "whatsapp_no",
+	"phone": "phone",
+	"phone ext": "phone_ext",
 	"company name": "company_name",
-	"company":      "company_name",
-	"website":      "website",
-	"fax":          "fax",
+	"company": "company_name",
+	"website": "website",
+	"fax": "fax",
 	"address line 1": "address_line1",
 	"address line 2": "address_line2",
-	"city":           "city",
-	"state":          "state",
-	"country":        "country",
-	"pincode":        "pincode",
-	"postal code":    "pincode",
-	"zip code":       "pincode",
-	"pin code":       "pincode",
+	"city": "city",
+	"state": "state",
+	"country": "country",
+	"pincode": "pincode",
+	"postal code": "pincode",
+	"zip code": "pincode",
+	"pin code": "pincode",
 }
 
 
@@ -185,6 +200,7 @@ def _find_bad_field(error_msg, data):
 	that caused it, or None if it cannot be determined.
 	"""
 	import re
+
 	# "Could not find {DocType}: {value}" — Link field resolution failure
 	m = re.search(r"Could not find ([\w ]+):", error_msg)
 	if m:
@@ -235,18 +251,20 @@ def _create_lead_address(lead_name, address_data, address_type="Office"):
 			if not remaining:
 				break
 			try:
-				address = frappe.get_doc({
-					"doctype": "Address",
-					"address_title": company_name,
-					"address_type": address_type,
-					"address_line1": remaining.get("address_line1"),
-					"address_line2": remaining.get("address_line2"),
-					"city": remaining.get("city"),
-					"state": remaining.get("state"),
-					"pincode": remaining.get("pincode"),
-					"country": remaining.get("country"),
-					"links": [{"link_doctype": "Lead", "link_name": lead_name}],
-				})
+				address = frappe.get_doc(
+					{
+						"doctype": "Address",
+						"address_title": company_name,
+						"address_type": address_type,
+						"address_line1": remaining.get("address_line1"),
+						"address_line2": remaining.get("address_line2"),
+						"city": remaining.get("city"),
+						"state": remaining.get("state"),
+						"pincode": remaining.get("pincode"),
+						"country": remaining.get("country"),
+						"links": [{"link_doctype": "Lead", "link_name": lead_name}],
+					}
+				)
 				address.insert(ignore_permissions=True)
 				frappe.db.commit()
 				break
@@ -266,16 +284,21 @@ def _create_lead_address(lead_name, address_data, address_type="Office"):
 				for f, v in skipped.items():
 					lines.append(f"<li><b>{f}</b>: {v}</li>")
 				lines.append("</ul>")
-				frappe.get_doc({
-					"doctype": "Comment",
-					"comment_type": "Info",
-					"reference_doctype": "Lead",
-					"reference_name": lead_name,
-					"content": "".join(lines),
-				}).insert(ignore_permissions=True)
+				frappe.get_doc(
+					{
+						"doctype": "Comment",
+						"comment_type": "Info",
+						"reference_doctype": "Lead",
+						"reference_name": lead_name,
+						"content": "".join(lines),
+					}
+				).insert(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
-				frappe.log_error(f"NextIQ: Failed to post skipped-fields comment for Lead {lead_name}", frappe.get_traceback())
+				frappe.log_error(
+					f"NextIQ: Failed to post skipped-fields comment for Lead {lead_name}",
+					frappe.get_traceback(),
+				)
 
 	except Exception as e:
 		frappe.log_error(f"NextIQ: Address creation failed for Lead {lead_name}", frappe.get_traceback())
@@ -292,13 +315,15 @@ def _create_lead_address(lead_name, address_data, address_type="Office"):
 						lines.append(f"<li><b>{f}</b>: {html.escape(str(v))}</li>")
 				lines.append("</ul>")
 			lines.append("<p>Please add the address manually to this lead.</p>")
-			frappe.get_doc({
-				"doctype": "Comment",
-				"comment_type": "Info",
-				"reference_doctype": "Lead",
-				"reference_name": lead_name,
-				"content": "".join(lines),
-			}).insert(ignore_permissions=True)
+			frappe.get_doc(
+				{
+					"doctype": "Comment",
+					"comment_type": "Info",
+					"reference_doctype": "Lead",
+					"reference_name": lead_name,
+					"content": "".join(lines),
+				}
+			).insert(ignore_permissions=True)
 			frappe.db.commit()
 		except Exception:
 			pass
@@ -341,16 +366,18 @@ def _create_erpnext_lead(data, address_data, scanned_by, log_name):
 			for f, v in skipped_fields.items():
 				lines.append(f"<li><b>{f}</b>: {v}</li>")
 			lines.append("</ul>")
-			frappe.get_doc({
-				"doctype": "Comment",
-				"comment_type": "Info",
-				"reference_doctype": "Lead",
-				"reference_name": lead_name,
-				"content": "".join(lines),
-			}).insert(ignore_permissions=True)
+			frappe.get_doc(
+				{
+					"doctype": "Comment",
+					"comment_type": "Info",
+					"reference_doctype": "Lead",
+					"reference_name": lead_name,
+					"content": "".join(lines),
+				}
+			).insert(ignore_permissions=True)
 			frappe.db.commit()
 
-		for addr_type, addr_fields in (address_data or []):
+		for addr_type, addr_fields in address_data or []:
 			_create_lead_address(lead_name, addr_fields, addr_type)
 	finally:
 		frappe.set_user(_orig_user)
@@ -360,11 +387,7 @@ def _create_erpnext_lead(data, address_data, scanned_by, log_name):
 
 def _create_crm_lead(data, scanned_by, log_name):
 	"""Create a Frappe CRM Lead from scan data. Address fields are dropped — CRM Lead has none."""
-	crm_data = {
-		_CRM_FIELD_REMAP.get(k, k): v
-		for k, v in data.items()
-		if k not in _CRM_DROP_FIELDS
-	}
+	crm_data = {_CRM_FIELD_REMAP.get(k, k): v for k, v in data.items() if k not in _CRM_DROP_FIELDS}
 
 	# CRM Lead requires first_name — use organization name as fallback for company-only cards
 	if not crm_data.get("first_name") and crm_data.get("organization"):
@@ -405,13 +428,15 @@ def _create_crm_lead(data, scanned_by, log_name):
 			for f, v in skipped_fields.items():
 				lines.append(f"<li><b>{f}</b>: {v}</li>")
 			lines.append("</ul>")
-			frappe.get_doc({
-				"doctype": "Comment",
-				"comment_type": "Info",
-				"reference_doctype": "CRM Lead",
-				"reference_name": lead_name,
-				"content": "".join(lines),
-			}).insert(ignore_permissions=True)
+			frappe.get_doc(
+				{
+					"doctype": "Comment",
+					"comment_type": "Info",
+					"reference_doctype": "CRM Lead",
+					"reference_name": lead_name,
+					"content": "".join(lines),
+				}
+			).insert(ignore_permissions=True)
 			frappe.db.commit()
 	finally:
 		frappe.set_user(_orig_user)
@@ -420,7 +445,7 @@ def _create_crm_lead(data, scanned_by, log_name):
 
 
 class _QuotaExceededError(Exception):
-    pass
+	pass
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -475,9 +500,14 @@ def _rate_limit(key, max_per_minute):
 
 # ── Public endpoints (called from card-scan portal JS) ───────────────────────
 
+
 @frappe.whitelist()
-def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=None,
-                     voice_clips=None):
+def submit_card_scan(
+	merged_image_base64: str,
+	filename: str = "business_card.jpg",
+	notes: str | None = None,
+	voice_clips: str | list | None = None,
+):
 	"""
 	Receive merged business card image + optional voice clips from the portal.
 	voice_clips: JSON array of {base64, mime} objects (up to 3).
@@ -486,9 +516,7 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	Returns immediately: {"log_name": str}
 	"""
 	# Block if the installed app is below the service-required minimum version
-	_service_min = frappe.db.get_value(
-		"NextIQ Settings", "NextIQ Settings", "service_min_version"
-	) or ""
+	_service_min = frappe.db.get_single_value("NextIQ Settings", "service_min_version") or ""
 	if _service_min and _version_lt(nextiq.__version__, _service_min):
 		frappe.throw(
 			"The NextIQ app on this site requires an update before scanning can continue. "
@@ -517,6 +545,7 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	if isinstance(voice_clips, str):
 		try:
 			import json as _json
+
 			voice_clips = _json.loads(voice_clips)
 		except Exception:
 			voice_clips = []
@@ -524,45 +553,53 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 		voice_clips = []
 	voice_clips = voice_clips[:3]  # hard cap at 3
 
-	job_id    = secrets.token_urlsafe(32)
+	job_id = secrets.token_urlsafe(32)
 	cb_secret = secrets.token_urlsafe(32)
 
-	log = frappe.get_doc({
-		"doctype": "Card Scan Log",
-		"status": "Pending",
-		"submitted_at": frappe.utils.now(),
-		"job_id": job_id,
-		"cb_secret": cb_secret,
-		"scanned_by": frappe.session.user,
-		"notes": notes_clean,
-	})
+	log = frappe.get_doc(
+		{
+			"doctype": "Card Scan Log",
+			"status": "Pending",
+			"submitted_at": frappe.utils.now(),
+			"job_id": job_id,
+			"cb_secret": cb_secret,
+			"scanned_by": frappe.session.user,
+			"notes": notes_clean,
+		}
+	)
 	log.insert(ignore_permissions=True)
 	frappe.db.commit()
 
 	# Save merged image
 	try:
-		file_doc = frappe.get_doc({
-			"doctype": "File",
-			"file_name": f"card_scan_{log.name}.jpg",
-			"content": base64.b64decode(merged_image_base64),
-			"is_private": 1,
-			"attached_to_doctype": "Card Scan Log",
-			"attached_to_name": log.name,
-		})
+		file_doc = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": f"card_scan_{log.name}.jpg",
+				"content": base64.b64decode(merged_image_base64),
+				"is_private": 1,
+				"attached_to_doctype": "Card Scan Log",
+				"attached_to_name": log.name,
+			}
+		)
 		file_doc.save(ignore_permissions=True)
 		frappe.db.set_value("Card Scan Log", log.name, "merged_image", file_doc.file_url)
 		frappe.db.commit()
 	except Exception as e:
-		frappe.db.set_value("Card Scan Log", log.name, {
-			"status": "Failed",
-			"error_message": f"Image save failed: {str(e)[:400]}",
-			"processed_at": frappe.utils.now(),
-		})
+		frappe.db.set_value(
+			"Card Scan Log",
+			log.name,
+			{
+				"status": "Failed",
+				"error_message": f"Image save failed: {str(e)[:400]}",
+				"processed_at": frappe.utils.now(),
+			},
+		)
 		frappe.db.commit()
 		return {"log_name": log.name}
 
 	# Save each voice clip as a private file; store URLs on the log
-	saved_clips = []   # [{url, mime}]
+	saved_clips = []  # [{url, mime}]
 	for idx, clip in enumerate(voice_clips):
 		if not isinstance(clip, dict) or not clip.get("base64"):
 			continue
@@ -571,21 +608,21 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 			if "," in b64:
 				b64 = b64.split(",")[1]
 			mime = (str(clip.get("mime") or "audio/webm"))[:50]
-			ext  = "mp4" if "mp4" in mime else ("ogg" if "ogg" in mime else "webm")
-			audio_doc = frappe.get_doc({
-				"doctype": "File",
-				"file_name": f"voice_{log.name}_{idx + 1}.{ext}",
-				"content": base64.b64decode(b64),
-				"is_private": 1,
-				"attached_to_doctype": "Card Scan Log",
-				"attached_to_name": log.name,
-			})
+			ext = "mp4" if "mp4" in mime else ("ogg" if "ogg" in mime else "webm")
+			audio_doc = frappe.get_doc(
+				{
+					"doctype": "File",
+					"file_name": f"voice_{log.name}_{idx + 1}.{ext}",
+					"content": base64.b64decode(b64),
+					"is_private": 1,
+					"attached_to_doctype": "Card Scan Log",
+					"attached_to_name": log.name,
+				}
+			)
 			audio_doc.save(ignore_permissions=True)
 			saved_clips.append({"url": audio_doc.file_url, "mime": mime})
 		except Exception:
-			frappe.log_error(
-				f"NextIQ: Voice clip {idx+1} save failed for {log.name}",
-				frappe.get_traceback())
+			frappe.log_error(f"NextIQ: Voice clip {idx+1} save failed for {log.name}", frappe.get_traceback())
 
 	# Store clip URLs in voice_audio, voice_audio_2, voice_audio_3
 	if saved_clips:
@@ -608,10 +645,20 @@ def submit_card_scan(merged_image_base64, filename="business_card.jpg", notes=No
 	return {"log_name": log.name}
 
 
-@frappe.whitelist(allow_guest=True)
-def scan_callback(job_id, cb_secret, success, data=None, error=None,
-                  message=None, scans_used=None, scans_allowed=None, scans_remaining=None,
-                  voice_notes=None):
+# Server-to-server webhook — see the Security section in the docstring below for the auth model.
+@frappe.whitelist(allow_guest=True)  # nosemgrep
+def scan_callback(
+	job_id: str,
+	cb_secret: str,
+	success: bool | str,
+	data: dict | None = None,
+	error: str | None = None,
+	message: str | None = None,
+	scans_used: int | None = None,
+	scans_allowed: int | None = None,
+	scans_remaining: int | None = None,
+	voice_notes: dict | None = None,
+):
 	"""
 	Called by nextiq_service when scan processing is complete.
 
@@ -629,9 +676,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 	if not job_id or not cb_secret:
 		return {"success": False, "error": "missing_params"}
 
-	log_data = frappe.db.get_value(
-		"Card Scan Log", {"job_id": job_id}, ["name", "scanned_by"], as_dict=True
-	)
+	log_data = frappe.db.get_value("Card Scan Log", {"job_id": job_id}, ["name", "scanned_by"], as_dict=True)
 	if not log_data:
 		return {"success": False, "error": "invalid_job_id"}
 	log_name = log_data.name
@@ -657,7 +702,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 	if success:
 		lead_name = None
 		crm_lead_name = None
-		address_data = []   # list of (address_type, fields_dict)
+		address_data = []  # list of (address_type, fields_dict)
 		original_data = dict(data) if data and isinstance(data, dict) else {}
 		if data and isinstance(data, dict):
 			# Pull the nested address block out first — service sends it as {"address": [...]}
@@ -685,9 +730,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				if k in _ALLOWED_LEAD_FIELDS and v not in (None, "")
 			}
 		if data:
-			destination = frappe.db.get_value(
-				"NextIQ Settings", "NextIQ Settings", "lead_destination"
-			) or "ERPNext"
+			destination = frappe.db.get_single_value("NextIQ Settings", "lead_destination") or "ERPNext"
 			installed = frappe.get_installed_apps()
 			make_erpnext = destination in ("ERPNext", "Both") and "erpnext" in installed
 			make_crm = destination in ("Frappe CRM", "Both") and "crm" in installed
@@ -741,25 +784,37 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			except frappe.exceptions.DuplicateEntryError as e:
 				err_msg = str(e)[:500] or "A lead with this email address already exists."
 				frappe.db.rollback()
-				frappe.db.set_value("Card Scan Log", log_name, {
-					"status": "Duplicate Lead",
-					"error_message": err_msg,
-					"processed_at": frappe.utils.now(),
-					"cb_secret": "",
-				})
+				frappe.db.set_value(
+					"Card Scan Log",
+					log_name,
+					{
+						"status": "Duplicate Lead",
+						"error_message": err_msg,
+						"processed_at": frappe.utils.now(),
+						"cb_secret": "",
+					},
+				)
 				frappe.db.commit()
 				_send_scan_notification(log_name, "duplicate_lead", message=err_msg)
 				return {"success": False, "error": "duplicate_lead"}
 			except frappe.ValidationError as e:
-				err_msg = str(e)[:500] or "AI data could not be saved as a Lead — all field values were invalid."
+				err_msg = (
+					str(e)[:500] or "AI data could not be saved as a Lead — all field values were invalid."
+				)
 				frappe.db.rollback()
-				frappe.db.set_value("Card Scan Log", log_name, {
-					"status": "Invalid Data",
-					"error_message": err_msg,
-					"ai_response": frappe.as_json({"lead": original_data or {}, "voice_notes": voice_notes or {}}),
-					"processed_at": frappe.utils.now(),
-					"cb_secret": "",
-				})
+				frappe.db.set_value(
+					"Card Scan Log",
+					log_name,
+					{
+						"status": "Invalid Data",
+						"error_message": err_msg,
+						"ai_response": frappe.as_json(
+							{"lead": original_data or {}, "voice_notes": voice_notes or {}}
+						),
+						"processed_at": frappe.utils.now(),
+						"cb_secret": "",
+					},
+				)
 				frappe.db.commit()
 				_send_scan_notification(log_name, "invalid_data", message=err_msg)
 				frappe.enqueue(
@@ -775,12 +830,16 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				frappe.log_error(f"NextIQ: Lead creation failed for {log_name}", traceback.format_exc())
 				err_msg = str(e)[:500] or "Lead could not be created from scan data."
 				frappe.db.rollback()
-				frappe.db.set_value("Card Scan Log", log_name, {
-					"status": "Failed",
-					"error_message": err_msg,
-					"processed_at": frappe.utils.now(),
-					"cb_secret": "",
-				})
+				frappe.db.set_value(
+					"Card Scan Log",
+					log_name,
+					{
+						"status": "Failed",
+						"error_message": err_msg,
+						"processed_at": frappe.utils.now(),
+						"cb_secret": "",
+					},
+				)
 				frappe.db.commit()
 				_send_scan_notification(log_name, "failed", message=err_msg)
 				frappe.enqueue(
@@ -798,7 +857,7 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			"lead": lead_name,
 			"processed_at": frappe.utils.now(),
 			"ai_response": frappe.as_json({"lead": original_data or {}, "voice_notes": voice_notes or {}}),
-			"cb_secret": "",   # single-use — clear after successful callback
+			"cb_secret": "",  # single-use — clear after successful callback
 		}
 		if "crm" in frappe.get_installed_apps():
 			success_fields["crm_lead"] = crm_lead_name
@@ -806,15 +865,14 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			success_fields["scans_remaining"] = scans_remaining
 		frappe.db.set_value("Card Scan Log", log_name, success_fields)
 		frappe.db.commit()
-		_send_scan_notification(log_name, "success",
-			lead_name=lead_name, scans_remaining=scans_remaining)
+		_send_scan_notification(log_name, "success", lead_name=lead_name, scans_remaining=scans_remaining)
 
 	else:
 		status_map = {
-			"quota_exceeded":     "Quota Exceeded",
+			"quota_exceeded": "Quota Exceeded",
 			"not_a_business_card": "Invalid Image",
-			"processing_failed":  "Failed",
-			"suspended":          "Failed",
+			"processing_failed": "Failed",
+			"suspended": "Failed",
 		}
 		status = status_map.get(error or "", "Failed")
 
@@ -822,19 +880,19 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 			"status": status,
 			"error_message": message or "Scan failed.",
 			"processed_at": frappe.utils.now(),
-			"cb_secret": "",   # clear regardless of outcome
+			"cb_secret": "",  # clear regardless of outcome
 		}
 		if scans_remaining is not None:
 			update_fields["scans_remaining"] = scans_remaining
 		frappe.db.set_value("Card Scan Log", log_name, update_fields)
 		frappe.db.commit()
-		_send_scan_notification(log_name, error or "failed",
-			message=message, scans_remaining=scans_remaining)
+		_send_scan_notification(log_name, error or "failed", message=message, scans_remaining=scans_remaining)
 
 	return {"success": True}
 
 
 # ── Background job ────────────────────────────────────────────────────────────
+
 
 def _fire_scan_to_service(log_name, saved_clips=None):
 	"""
@@ -857,37 +915,41 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 			raise Exception("Scan log is missing job credentials. Please re-submit.")
 
 		# Load image
-		file_doc     = frappe.get_doc("File", {"file_url": log.merged_image})
+		file_doc = frappe.get_doc("File", {"file_url": log.merged_image})
 		image_base64 = base64.b64encode(file_doc.get_content()).decode()
 
 		# Load voice clips from saved file URLs
 		voice_clips_payload = []
-		for clip_info in (saved_clips or []):
+		for clip_info in saved_clips or []:
 			if not isinstance(clip_info, dict) or not clip_info.get("url"):
 				continue
 			try:
 				af = frappe.get_doc("File", {"file_url": clip_info["url"]})
-				voice_clips_payload.append({
-					"base64": base64.b64encode(af.get_content()).decode(),
-					"mime":   clip_info.get("mime", "audio/webm"),
-				})
+				voice_clips_payload.append(
+					{
+						"base64": base64.b64encode(af.get_content()).decode(),
+						"mime": clip_info.get("mime", "audio/webm"),
+					}
+				)
 			except Exception:
-				frappe.log_error(f"NextIQ: Voice clip load failed for {log_name} — skipping", frappe.get_traceback())
+				frappe.log_error(
+					f"NextIQ: Voice clip load failed for {log_name} — skipping", frappe.get_traceback()
+				)
 
 		callback_url = frappe.utils.get_url() + "/api/method/nextiq.api.scan_callback"
-		service_url  = _service_url()
+		service_url = _service_url()
 		logger.info(f"[NextIQ] Calling service at {service_url}, job_id={log.job_id}")
 
 		payload = {
-			"image_base64":    image_base64,
-			"filename":        log.merged_image.split("/")[-1] if log.merged_image else "business_card.jpg",
-			"job_id":          log.job_id,
-			"callback_url":    callback_url,
-			"cb_secret":       log.cb_secret,
+			"image_base64": image_base64,
+			"filename": log.merged_image.split("/")[-1] if log.merged_image else "business_card.jpg",
+			"job_id": log.job_id,
+			"callback_url": callback_url,
+			"cb_secret": log.cb_secret,
 			"customer_log_id": log.name,
-			"notes":           log.notes or "",
-			"scanned_by":      log.scanned_by,
-			"today":           frappe.utils.today(),
+			"notes": log.notes or "",
+			"scanned_by": log.scanned_by,
+			"today": frappe.utils.today(),
 		}
 		if voice_clips_payload:
 			payload["voice_clips"] = voice_clips_payload
@@ -897,21 +959,17 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 				f"{service_url}/api/method/nextiq_service.api.process_scan",
 				json=payload,
 				headers={
-					"Content-Type":            "application/json",
+					"Content-Type": "application/json",
 					"X-NextIQ-Client-Version": nextiq.__version__,
 					**auth_headers,
 				},
 				timeout=15,  # service should accept in <1s — short timeout
 			)
 		except requests.exceptions.ConnectionError:
-			raise Exception(
-				f"Cannot reach NextIQ Service at {service_url}. "
-				"Please contact support."
-			)
+			raise Exception(f"Cannot reach NextIQ Service at {service_url}. " "Please contact support.")
 		except requests.exceptions.Timeout:
 			raise Exception(
-				"NextIQ Service did not accept the job in time. "
-				"The service may be down. Please try again."
+				"NextIQ Service did not accept the job in time. " "The service may be down. Please try again."
 			)
 
 		if response.status_code == 503:
@@ -933,7 +991,9 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 				s.save(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
-				frappe.log_error("NextIQ: Failed to update connection_status after 401/403", frappe.get_traceback())
+				frappe.log_error(
+					"NextIQ: Failed to update connection_status after 401/403", frappe.get_traceback()
+				)
 			raise Exception(
 				f"NextIQ Service rejected the request ({response.status_code}). "
 				"Please reconnect via NextIQ Settings."
@@ -958,32 +1018,42 @@ def _fire_scan_to_service(log_name, saved_clips=None):
 
 	except _QuotaExceededError as e:
 		logger.warning(f"[NextIQ] Quota exceeded for scan {log_name}: {e}")
-		frappe.db.set_value("Card Scan Log", log_name, {
-			"status": "Quota Exceeded",
-			"error_message": str(e)[:1000],
-			"processed_at": frappe.utils.now(),
-		})
+		frappe.db.set_value(
+			"Card Scan Log",
+			log_name,
+			{
+				"status": "Quota Exceeded",
+				"error_message": str(e)[:1000],
+				"processed_at": frappe.utils.now(),
+			},
+		)
 		frappe.db.commit()
 		_send_scan_notification(log_name, "quota_exceeded", message=str(e))
 	except Exception as e:
 		logger.error(f"[NextIQ] Failed to fire scan {log_name}: {e}\n{traceback.format_exc()}")
 		frappe.log_error(f"NextIQ: Fire Scan Failed: {log_name}", traceback.format_exc())
-		frappe.db.set_value("Card Scan Log", log_name, {
-			"status": "Failed",
-			"error_message": str(e)[:1000],
-			"processed_at": frappe.utils.now(),
-		})
+		frappe.db.set_value(
+			"Card Scan Log",
+			log_name,
+			{
+				"status": "Failed",
+				"error_message": str(e)[:1000],
+				"processed_at": frappe.utils.now(),
+			},
+		)
 		frappe.db.commit()
 		_send_scan_notification(log_name, "failed", message=str(e))
 
 
 # ── Notes helper ─────────────────────────────────────────────────────────────
 
+
 def _append_media_comment(ref_doctype, ref_name, log_name, comment_type="Info"):
 	"""Post scanned card image and voice clips as a comment on the lead. Fails silently."""
 	try:
 		log = frappe.db.get_value(
-			"Card Scan Log", log_name,
+			"Card Scan Log",
+			log_name,
 			["merged_image", "voice_audio", "voice_audio_2", "voice_audio_3"],
 			as_dict=True,
 		)
@@ -995,7 +1065,7 @@ def _append_media_comment(ref_doctype, ref_name, log_name, comment_type="Info"):
 		if log.merged_image:
 			escaped = html.escape(log.merged_image)
 			lines.append(
-				f'<p><b>Business Card:</b></p>'
+				f"<p><b>Business Card:</b></p>"
 				f'<p><img src="{escaped}" style="max-width:500px;border-radius:4px;"></p>'
 			)
 
@@ -1007,20 +1077,22 @@ def _append_media_comment(ref_doctype, ref_name, log_name, comment_type="Info"):
 			if url:
 				escaped = html.escape(url)
 				lines.append(
-					f'<p><b>{label}:</b><br>'
+					f"<p><b>{label}:</b><br>"
 					f'<audio controls src="{escaped}" style="width:100%;max-width:420px;"></audio></p>'
 				)
 
 		if not lines:
 			return
 
-		frappe.get_doc({
-			"doctype": "Comment",
-			"comment_type": comment_type,
-			"reference_doctype": ref_doctype,
-			"reference_name": ref_name,
-			"content": "".join(lines),
-		}).insert(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "Comment",
+				"comment_type": comment_type,
+				"reference_doctype": ref_doctype,
+				"reference_name": ref_name,
+				"content": "".join(lines),
+			}
+		).insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
@@ -1037,11 +1109,14 @@ def _append_scan_note(lead_name, log_name, scanned_by):
 			return
 		note_html = "<p>" + html.escape(str(log_notes)).replace("\n", "<br>") + "</p>"
 		lead_doc = frappe.get_doc("Lead", lead_name)
-		lead_doc.append("notes", {
-			"note": note_html,
-			"added_by": scanned_by,
-			"added_on": frappe.utils.now_datetime(),
-		})
+		lead_doc.append(
+			"notes",
+			{
+				"note": note_html,
+				"added_by": scanned_by,
+				"added_on": frappe.utils.now_datetime(),
+			},
+		)
 		lead_doc.save(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception:
@@ -1053,6 +1128,7 @@ def _append_scan_note(lead_name, log_name, scanned_by):
 
 # ── CRM Lead note helper ─────────────────────────────────────────────────────
 
+
 def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
 	"""Add the scan-time written note to the CRM Lead as an FCRM Note. Fails silently."""
 	try:
@@ -1060,13 +1136,15 @@ def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
 		if not log_notes or not crm_lead_name:
 			return
 		note_html = "<p>" + html.escape(str(log_notes)).replace("\n", "<br>") + "</p>"
-		frappe.get_doc({
-			"doctype": "FCRM Note",
-			"title": "Scan Note",
-			"content": note_html,
-			"reference_doctype": "CRM Lead",
-			"reference_docname": crm_lead_name,
-		}).insert(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "FCRM Note",
+				"title": "Scan Note",
+				"content": note_html,
+				"reference_doctype": "CRM Lead",
+				"reference_docname": crm_lead_name,
+			}
+		).insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception:
 		frappe.log_error(
@@ -1077,6 +1155,7 @@ def _append_crm_lead_note(crm_lead_name, log_name, scanned_by):
 
 # ── Bilingual text helpers ────────────────────────────────────────────────────
 
+
 def _bi_html(en, native):
 	"""
 	Return HTML combining English + native text.
@@ -1085,7 +1164,7 @@ def _bi_html(en, native):
 	  non-ASCII characters (actual script, not a transliteration duplicate).
 	"""
 	en_clean = re.sub(r"\s*\([^)]*\)\s*$", "", str(en or "")).strip() or str(en or "")
-	nat      = str(native or "").strip()
+	nat = str(native or "").strip()
 	if nat and nat != en_clean and any(ord(c) > 127 for c in nat):
 		return en_clean + "<p><em>(" + nat.replace("<p>", "").replace("</p>", "") + ")</em></p>"
 	return en_clean or str(en or "")
@@ -1097,13 +1176,14 @@ def _bi_inline(en, native, max_len=100):
 	Same guard: native must differ from en and contain non-ASCII script.
 	"""
 	en_clean = re.sub(r"\s*\([^)]*\)\s*$", "", str(en or "")).strip() or str(en or "")
-	nat      = str(native or "").strip()
+	nat = str(native or "").strip()
 	if nat and nat != en_clean and any(ord(c) > 127 for c in nat):
 		return f"{en_clean} ({nat})"[:max_len]
 	return en_clean[:max_len]
 
 
 # ── Voice notes helper ───────────────────────────────────────────────────────
+
 
 def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 	"""
@@ -1114,8 +1194,8 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 		return
 
 	summary_note = voice_notes.get("summary_note") or ""
-	tasks        = voice_notes.get("tasks") or []
-	events       = voice_notes.get("events") or []
+	tasks = voice_notes.get("tasks") or []
+	events = voice_notes.get("events") or []
 
 	if not summary_note and not tasks and not events:
 		return
@@ -1130,11 +1210,14 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 		if summary_note.strip():
 			try:
 				lead_doc = frappe.get_doc("Lead", lead_name)
-				lead_doc.append("notes", {
-					"note":     summary_note,
-					"added_by": scanned_by or frappe.session.user,
-					"added_on": frappe.utils.now_datetime(),
-				})
+				lead_doc.append(
+					"notes",
+					{
+						"note": summary_note,
+						"added_by": scanned_by or frappe.session.user,
+						"added_on": frappe.utils.now_datetime(),
+					},
+				)
 				lead_doc.save(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
@@ -1146,16 +1229,18 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 				if not isinstance(task, dict) or not task.get("description"):
 					continue
 				task_html = _bi_html(task.get("description", ""), task.get("description_native"))
-				frappe.get_doc({
-					"doctype":        "ToDo",
-					"status":         "Open",
-					"priority":       "Medium",
-					"description":    task_html[:2000],
-					"date":           (task.get("date") or frappe.utils.today())[:10],
-					"reference_type": "Lead",
-					"reference_name": lead_name,
-					"allocated_to":   scanned_by or frappe.session.user,
-				}).insert(ignore_permissions=True)
+				frappe.get_doc(
+					{
+						"doctype": "ToDo",
+						"status": "Open",
+						"priority": "Medium",
+						"description": task_html[:2000],
+						"date": (task.get("date") or frappe.utils.today())[:10],
+						"reference_type": "Lead",
+						"reference_name": lead_name,
+						"allocated_to": scanned_by or frappe.session.user,
+					}
+				).insert(ignore_permissions=True)
 			if tasks:
 				frappe.db.commit()
 		except Exception:
@@ -1170,22 +1255,26 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 				category = event.get("event_category", "Meeting")
 				if category not in _VALID_CATEGORIES:
 					category = "Other"
-				starts_on    = event.get("starts_on") or str(frappe.utils.today())
+				starts_on = event.get("starts_on") or str(frappe.utils.today())
 				full_subject = _bi_inline(event.get("subject", ""), event.get("subject_native"), max_len=100)
-				event_desc   = _bi_html(event.get("description", ""), event.get("description_native"))
-				frappe.get_doc({
-					"doctype":           "Event",
-					"subject":           full_subject,
-					"event_category":    category,
-					"starts_on":         starts_on,
-					"description":       event_desc[:2000],
-					"status":            "Open",
-					"event_type":        "Private",
-					"event_participants": [{
-						"reference_doctype": "Lead",
-						"reference_docname": lead_name,
-					}],
-				}).insert(ignore_permissions=True)
+				event_desc = _bi_html(event.get("description", ""), event.get("description_native"))
+				frappe.get_doc(
+					{
+						"doctype": "Event",
+						"subject": full_subject,
+						"event_category": category,
+						"starts_on": starts_on,
+						"description": event_desc[:2000],
+						"status": "Open",
+						"event_type": "Private",
+						"event_participants": [
+							{
+								"reference_doctype": "Lead",
+								"reference_docname": lead_name,
+							}
+						],
+					}
+				).insert(ignore_permissions=True)
 			if events:
 				frappe.db.commit()
 		except Exception:
@@ -1197,6 +1286,7 @@ def _apply_voice_notes(lead_name, voice_notes, scanned_by):
 
 # ── CRM voice notes helper ───────────────────────────────────────────────────
 
+
 def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 	"""
 	Create FCRM Note, CRM Tasks, and Events from AI-extracted voice note data for a CRM Lead.
@@ -1207,8 +1297,8 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 		return
 
 	summary_note = voice_notes.get("summary_note") or ""
-	tasks        = voice_notes.get("tasks") or []
-	events       = voice_notes.get("events") or []
+	tasks = voice_notes.get("tasks") or []
+	events = voice_notes.get("events") or []
 
 	if not summary_note and not tasks and not events:
 		return
@@ -1222,13 +1312,15 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 		# ── Summary note as FCRM Note ─────────────────────────────────────────
 		if summary_note.strip():
 			try:
-				frappe.get_doc({
-					"doctype":           "FCRM Note",
-					"title":             "Scan Note",
-					"content":           summary_note,
-					"reference_doctype": "CRM Lead",
-					"reference_docname": crm_lead_name,
-				}).insert(ignore_permissions=True)
+				frappe.get_doc(
+					{
+						"doctype": "FCRM Note",
+						"title": "Scan Note",
+						"content": summary_note,
+						"reference_doctype": "CRM Lead",
+						"reference_docname": crm_lead_name,
+					}
+				).insert(ignore_permissions=True)
 				frappe.db.commit()
 			except Exception:
 				frappe.log_error(f"NextIQ: CRM Note failed for {crm_lead_name}", frappe.get_traceback())
@@ -1239,18 +1331,27 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 				if not isinstance(task, dict) or not task.get("description"):
 					continue
 				task_html = _bi_html(task.get("description", ""), task.get("description_native"))
-				title = re.sub(r"<[^>]+>", "", re.sub(r"\s*\([^)]*\)\s*$", "", str(task.get("description", ""))).strip()).strip()[:140] or "Task"
-				frappe.get_doc({
-					"doctype":           "CRM Task",
-					"title":             title,
-					"description":       task_html[:2000],
-					"status":            "Todo",
-					"priority":          "Medium",
-					"due_date":          (task.get("date") or frappe.utils.today())[:10],
-					"assigned_to":       scanned_by or frappe.session.user,
-					"reference_doctype": "CRM Lead",
-					"reference_docname": crm_lead_name,
-				}).insert(ignore_permissions=True)
+				title = (
+					re.sub(
+						r"<[^>]+>",
+						"",
+						re.sub(r"\s*\([^)]*\)\s*$", "", str(task.get("description", ""))).strip(),
+					).strip()[:140]
+					or "Task"
+				)
+				frappe.get_doc(
+					{
+						"doctype": "CRM Task",
+						"title": title,
+						"description": task_html[:2000],
+						"status": "Todo",
+						"priority": "Medium",
+						"due_date": (task.get("date") or frappe.utils.today())[:10],
+						"assigned_to": scanned_by or frappe.session.user,
+						"reference_doctype": "CRM Lead",
+						"reference_docname": crm_lead_name,
+					}
+				).insert(ignore_permissions=True)
 			if tasks:
 				frappe.db.commit()
 		except Exception:
@@ -1270,20 +1371,22 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 				if category not in _VALID_CATEGORIES:
 					category = "Other"
 				full_subject = _bi_inline(event.get("subject", ""), event.get("subject_native"), max_len=100)
-				event_desc   = _bi_html(event.get("description", ""), event.get("description_native"))
-				due_date     = (event.get("starts_on") or str(frappe.utils.today()))[:10]
-				title        = re.sub(r"<[^>]+>", "", f"{category}: {full_subject}").strip()[:140] or category
-				frappe.get_doc({
-					"doctype":           "CRM Task",
-					"title":             title,
-					"description":       event_desc[:2000],
-					"status":            "Todo",
-					"priority":          "Medium",
-					"due_date":          due_date,
-					"assigned_to":       scanned_by or frappe.session.user,
-					"reference_doctype": "CRM Lead",
-					"reference_docname": crm_lead_name,
-				}).insert(ignore_permissions=True)
+				event_desc = _bi_html(event.get("description", ""), event.get("description_native"))
+				due_date = (event.get("starts_on") or str(frappe.utils.today()))[:10]
+				title = re.sub(r"<[^>]+>", "", f"{category}: {full_subject}").strip()[:140] or category
+				frappe.get_doc(
+					{
+						"doctype": "CRM Task",
+						"title": title,
+						"description": event_desc[:2000],
+						"status": "Todo",
+						"priority": "Medium",
+						"due_date": due_date,
+						"assigned_to": scanned_by or frappe.session.user,
+						"reference_doctype": "CRM Lead",
+						"reference_docname": crm_lead_name,
+					}
+				).insert(ignore_permissions=True)
 			if events:
 				frappe.db.commit()
 		except Exception:
@@ -1294,6 +1397,7 @@ def _apply_crm_voice_notes(crm_lead_name, voice_notes, scanned_by):
 
 
 # ── Feedback to service ───────────────────────────────────────────────────────
+
 
 def _send_feedback_to_service(log_name, feedback_type):
 	"""
@@ -1313,10 +1417,10 @@ def _send_feedback_to_service(log_name, feedback_type):
 		requests.post(
 			f"{_service_url()}/api/method/nextiq_service.api.receive_scan_feedback",
 			json={
-				"job_id":          log.job_id,
-				"feedback_type":   feedback_type,
-				"error_message":   log.error_message or "",
-				"ai_response":     log.ai_response or "",
+				"job_id": log.job_id,
+				"feedback_type": feedback_type,
+				"error_message": log.error_message or "",
+				"ai_response": log.ai_response or "",
 				"customer_log_id": log.name,
 			},
 			headers={
@@ -1333,6 +1437,7 @@ def _send_feedback_to_service(log_name, feedback_type):
 
 
 # ── Email notification ────────────────────────────────────────────────────────
+
 
 def _send_scan_notification(log_name, outcome, lead_name=None, message=None, scans_remaining=None):
 	"""Send email to the ERPNext user who submitted the scan."""
@@ -1374,26 +1479,29 @@ def _send_scan_notification(log_name, outcome, lead_name=None, message=None, sca
 
 # ── Lead destination helper ──────────────────────────────────────────────────
 
+
 @frappe.whitelist()
 def get_installed_lead_destinations():
 	"""Return which lead-capable apps are installed. Used by NextIQ Settings JS to filter options."""
 	installed = frappe.get_installed_apps()
 	return {
 		"has_erpnext": "erpnext" in installed,
-		"has_crm":     "crm" in installed,
+		"has_crm": "crm" in installed,
 	}
 
 
 # ── Time saved metric ────────────────────────────────────────────────────────
 
+
 @frappe.whitelist()
 def get_time_saved_minutes():
-	"""Number Card data source: successful leads × 2 minutes per lead."""
+	"""Number Card data source: successful leads x 2 minutes per lead."""
 	count = frappe.db.count("Card Scan Log", {"status": "Success"})
 	return (count or 0) * 2
 
 
 # ── Live balance proxy ────────────────────────────────────────────────────────
+
 
 @frappe.whitelist()
 def get_live_balance():
@@ -1406,7 +1514,7 @@ def get_live_balance():
 	Returns the service response dict, or {"success": False, ...} on error.
 	"""
 	auth_headers = _get_service_auth_headers()
-	service_url  = _service_url()
+	service_url = _service_url()
 
 	try:
 		resp = requests.get(
@@ -1418,16 +1526,17 @@ def get_live_balance():
 			timeout=10,
 		)
 	except requests.exceptions.ConnectionError:
-		frappe.throw(f"Cannot reach NextIQ Service at {service_url}.",
-					 title="Connection Error")
+		frappe.throw(
+			_("Cannot reach NextIQ Service at {0}.").format(service_url), title=_("Connection Error")
+		)
 	except requests.exceptions.Timeout:
-		frappe.throw("NextIQ Service did not respond in time.", title="Timeout")
+		frappe.throw(_("NextIQ Service did not respond in time."), title=_("Timeout"))
 
 	if resp.status_code == 429:
-		frappe.throw("Balance check rate limit reached. Please wait a moment.",
-					 title="Rate Limited")
+		frappe.throw(_("Balance check rate limit reached. Please wait a moment."), title=_("Rate Limited"))
 	if resp.status_code >= 400:
-		frappe.throw(f"NextIQ Service returned error {resp.status_code}.",
-					 title="Service Error")
+		frappe.throw(
+			_("NextIQ Service returned error {0}.").format(resp.status_code), title=_("Service Error")
+		)
 
 	return resp.json().get("message", {})

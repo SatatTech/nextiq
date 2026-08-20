@@ -1,8 +1,8 @@
 no_cache = 1
 
-import nextiq
 import frappe
 
+import nextiq
 from nextiq.version_check import _version_lt, check_service_version
 
 
@@ -16,12 +16,10 @@ def get_context(context):
 
 	_maybe_sync_version()
 
-	service_min_version = frappe.db.get_value(
-		"NextIQ Settings", "NextIQ Settings", "service_min_version"
-	) or ""
+	service_min_version = frappe.db.get_single_value("NextIQ Settings", "service_min_version") or ""
 
-	context.service_min_version    = service_min_version
-	context.current_version        = nextiq.__version__
+	context.service_min_version = service_min_version
+	context.current_version = nextiq.__version__
 	context.needs_mandatory_update = bool(
 		service_min_version and _version_lt(nextiq.__version__, service_min_version)
 	)
@@ -30,11 +28,10 @@ def get_context(context):
 def _maybe_sync_version():
 	"""Sync min version from service, at most once every 5 minutes."""
 	try:
-		last_checked = frappe.db.get_value(
-			"NextIQ Settings", "NextIQ Settings", "version_last_checked"
-		)
+		last_checked = frappe.db.get_single_value("NextIQ Settings", "version_last_checked")
 		if last_checked:
-			from frappe.utils import time_diff_in_seconds, now_datetime
+			from frappe.utils import now_datetime, time_diff_in_seconds
+
 			if time_diff_in_seconds(now_datetime(), last_checked) < 300:
 				return
 		check_service_version()
