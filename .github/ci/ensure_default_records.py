@@ -1,5 +1,5 @@
 # Run via: env/bin/python .github/ci/ensure_default_records.py test_site
-# (from the bench root, so the site name resolves under sites/) — see ci.yml
+# (from the bench root — see ci.yml)
 #
 # CI-only test-environment setup, not part of nextiq itself: Frappe's test
 # runner auto-creates a test Company record for any app under test once
@@ -16,12 +16,18 @@
 # a real *installed app name*, not just an importable module on
 # PYTHONPATH — it isn't a generic Python import, so a standalone CI script
 # can never be reached that way regardless of PYTHONPATH.
+import os
 import sys
 
 import frappe
 
 site = sys.argv[1]
-frappe.init(site=site, sites_path="sites")
+# bench's own CLI always chdir()s into <bench_root>/sites before running any
+# command — Frappe internals rely on that (e.g. the logger builds its log
+# path as "../logs", relative to CWD). Replicate that here so frappe.init()
+# and everything downstream of it behaves exactly like a real bench command.
+os.chdir("sites")
+frappe.init(site=site)
 frappe.connect()
 if not frappe.db.exists("Warehouse Type", "Transit"):
 	frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
