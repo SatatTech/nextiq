@@ -1626,11 +1626,17 @@ function checkForUpdates() {
     }
 
     // ── API helper (portal-safe: uses frappe.call which handles CSRF) ────────
-    function apiCall(method, args) {
+    // httpMethod defaults to POST (CSRF-checked) for anything that writes data.
+    // Pass "GET" only for read-only calls — GET requests are exempt from Frappe's
+    // CSRF check (frappe/auth.py: UNSAFE_HTTP_METHODS = POST/PUT/DELETE/PATCH),
+    // which sidesteps the session's CSRF token not being persisted yet on a
+    // brand-new session (see fetchBalance below).
+    function apiCall(method, args, httpMethod) {
       return new Promise((resolve, reject) => {
         frappe.call({
           method: method,
           args: args || {},
+          type: httpMethod || "POST",
           freeze: false,
           callback: r => resolve(r.message),
           error: r => reject(r),
@@ -1650,7 +1656,7 @@ function checkForUpdates() {
     }
 
     function fetchBalance() {
-      apiCall("nextiq.api.get_live_balance").then(d => {
+      apiCall("nextiq.api.get_live_balance", {}, "GET").then(d => {
         if (d && d.success) {
           scansRemaining = d.scans_remaining;
           scansAllowed = d.scans_allowed;
@@ -1894,8 +1900,6 @@ function checkForUpdates() {
     }
 
     // ── Init ───────────────────────────────────────────────────────────────
-    // Frappe injects frappe.csrf_token AFTER our script block in the HTML,
-    // so defer the first API call to after the full page has parsed.
     setTimeout(fetchBalance, 0);
     startCamera().then(() => {
       goToStep1();
