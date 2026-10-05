@@ -13,9 +13,7 @@ frappe.provide("nextiq");
 nextiq.BalanceView = class BalanceView {
 	constructor(page) {
 		this.page = page;
-		this.$body = $(
-			'<div style="max-width: 420px; margin: 24px auto;">'
-		).appendTo(page.body);
+		this.$body = $('<div style="max-width: 420px; margin: 24px auto;">').appendTo(page.body);
 		this.page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
 		this.load();
 	}
@@ -77,8 +75,6 @@ nextiq.BalanceView = class BalanceView {
 	}
 
 	render_error(msg) {
-		this.$body.html(
-			`<div class="alert alert-warning">${frappe.utils.escape_html(msg)}</div>`
-		);
+		this.$body.html(`<div class="alert alert-warning">${frappe.utils.escape_html(msg)}</div>`);
 	}
 };
