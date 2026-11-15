@@ -1,0 +1,31 @@
+# Release Please keeps one release PR open on version-16: version bump in nextiq/__init__.py and
+# CHANGELOG.md, both built from the Conventional Commit titles of merged PRs. Merging that PR tags
+# vX.Y.Z and publishes the GitHub Release.
+# Process: SatatTech/Satat_fca docs/v16-migration/RELEASING.md.
+name: Release
+
+on:
+  push:
+    branches: [version-16]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          # GitHub does not start workflows for PRs opened with GITHUB_TOKEN, so CI would not run on the
+          # release PR. A RELEASE_TOKEN secret (contents and pull requests: write) avoids that.
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
