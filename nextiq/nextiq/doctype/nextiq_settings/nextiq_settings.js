@@ -11,6 +11,7 @@ frappe.ui.form.on("NextIQ Settings", {
 				if (has_crm) options.push("Frappe CRM");
 				if (has_erpnext && has_crm) options.push("Both");
 				frm.set_df_property("lead_destination", "options", options.join("\n"));
+				frm.refresh_field("lead_destination");
 				if (options.length && !options.includes(frm.doc.lead_destination)) {
 					frm.set_value("lead_destination", options[0]);
 				}
