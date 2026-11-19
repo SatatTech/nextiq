@@ -5,7 +5,7 @@ fixtures = [
 app_name = "nextiq"
 app_title = "NextIQ"
 app_publisher = "krushang.patel@satat.tech"
-app_description = "Scan business cards and instantly create ERPNext leads using AI. Install on any ERPNext site to enable one-tap card capture for your team."
+app_description = "Scan business cards and instantly create leads in Frappe CRM or ERPNext using AI. Works on any Frappe site with Frappe CRM and/or ERPNext installed."
 app_email = "krushang.patel@satat.tech"
 app_license = "mit"
 
@@ -13,8 +13,6 @@ boot_session = "nextiq.boot.boot_session"
 
 # Apps
 # ------------------
-
-required_apps = ["erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
 add_to_apps_screen = [
@@ -87,6 +85,7 @@ app_include_js = "/assets/nextiq/js/nextiq.js"
 # Installation
 # ------------
 
+before_install = "nextiq.setup.before_install"
 after_install = "nextiq.setup.after_install"
 after_migrate = "nextiq.setup.after_migrate"
 
