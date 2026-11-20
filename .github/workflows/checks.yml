@@ -37,6 +37,20 @@ jobs:
         run: |
           pip install pre-commit semgrep
           BASE=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
-          if [ -f .pre-commit-config.yaml ]; then pre-commit run --show-diff-on-failure --from-ref "$BASE" --to-ref HEAD; fi
+          if [ -f .pre-commit-config.yaml ]; then
+            # Check only files that already passed pre-commit at the base. Reformatting a whole older file in a
+            # feature PR buries the real change; such files get formatted in a PR of their own.
+            git worktree add -q --detach /tmp/base "$BASE"
+            check=(); skip=()
+            while read -r f; do
+              if [ -f "/tmp/base/$f" ] && ! (cd /tmp/base && pre-commit run -c "$GITHUB_WORKSPACE/.pre-commit-config.yaml" --files "$f" >/dev/null 2>&1); then
+                skip+=("$f")
+              else
+                check+=("$f")
+              fi
+            done < <(git diff --name-only --diff-filter=ACMR "$BASE" HEAD)
+            [ ${#skip[@]} -eq 0 ] || echo "::notice::Not formatted at the base, so not checked here: ${skip[*]}"
+            [ ${#check[@]} -eq 0 ] || pre-commit run --show-diff-on-failure --files "${check[@]}"
+          fi
           git clone --depth 1 https://github.com/frappe/semgrep-rules.git /tmp/frappe-semgrep-rules
           semgrep scan --metrics=off --error --config /tmp/frappe-semgrep-rules/rules --baseline-commit "$BASE" nextiq
