@@ -22,7 +22,7 @@ def check_service_version():
 	Fetches version requirements from NextIQ Service and caches the result
 	in NextIQ Settings for the boot session to read.
 	"""
-	frappe.only_for(("Sales Manager", "System Manager"))
+	frappe.only_for(("Sales User", "Sales Manager", "System Manager"))
 	try:
 		from nextiq.api import _get_service_auth_headers
 		try:
