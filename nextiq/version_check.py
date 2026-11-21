@@ -22,6 +22,7 @@ def check_service_version():
 	Fetches version requirements from NextIQ Service and caches the result
 	in NextIQ Settings for the boot session to read.
 	"""
+	frappe.only_for(("Sales User", "Sales Manager", "System Manager"))
 	try:
 		from nextiq.api import _get_service_auth_headers
 		try:
@@ -50,7 +51,7 @@ def check_service_version():
 		min_version  = data.get("min_client_version") or "0.0.1"
 		needs_update = _version_lt(nextiq.__version__, min_version)
 
-		frappe.db.set_value("NextIQ Settings", "NextIQ Settings", {
+		frappe.db.set_single_value("NextIQ Settings", {
 			"service_min_version":    min_version,
 			"needs_mandatory_update": 1 if needs_update else 0,
 			"version_last_checked":   frappe.utils.now_datetime(),

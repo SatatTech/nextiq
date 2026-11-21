@@ -1405,6 +1405,7 @@ def get_live_balance():
 
 	Returns the service response dict, or {"success": False, ...} on error.
 	"""
+	frappe.only_for(("Sales User", "Sales Manager", "System Manager"))
 	auth_headers = _get_service_auth_headers()
 	service_url  = _service_url()
 

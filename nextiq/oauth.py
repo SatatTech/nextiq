@@ -342,6 +342,7 @@ def callback(code=None, state=None, error=None):
 
 @frappe.whitelist()
 def disconnect():
+    frappe.only_for("System Manager")
     settings      = frappe.get_single("NextIQ Settings")
     access_token  = settings.get_password("oauth_access_token")  if settings.oauth_access_token  else None
     refresh_token = settings.get_password("oauth_refresh_token") if settings.oauth_refresh_token else None
