@@ -59,8 +59,7 @@
     ".": {
       "release-type": "python",
       "package-name": "nextiq",
-      "changelog-path": "CHANGELOG.md",
-      "release-as": "0.1.0"
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
