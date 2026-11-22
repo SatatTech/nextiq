@@ -60,9 +60,7 @@
       "release-type": "python",
       "package-name": "nextiq",
       "changelog-path": "CHANGELOG.md",
-      "prerelease": true,
-      "versioning": "prerelease",
-      "prerelease-type": "rc"
+      "release-as": "0.1.0"
     }
   }
 }
