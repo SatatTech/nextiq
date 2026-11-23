@@ -685,9 +685,12 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 				if k in _ALLOWED_LEAD_FIELDS and v not in (None, "")
 			}
 		if data:
-			destination = frappe.db.get_value(
-				"NextIQ Settings", "NextIQ Settings", "lead_destination"
-			) or "ERPNext"
+			from nextiq.nextiq.doctype.nextiq_settings.nextiq_settings import get_default_lead_destination
+
+			destination = (
+				frappe.db.get_single_value("NextIQ Settings", "lead_destination")
+				or get_default_lead_destination()
+			)
 			installed = frappe.get_installed_apps()
 			make_erpnext = destination in ("ERPNext", "Both") and "erpnext" in installed
 			make_crm = destination in ("Frappe CRM", "Both") and "crm" in installed
@@ -701,8 +704,8 @@ def scan_callback(job_id, cb_secret, success, data=None, error=None,
 					# all. Raise so this lands in the same Failed/notify/feedback path as
 					# every other lead-creation error instead of silently reporting Success.
 					raise RuntimeError(
-						f"Lead Destination is set to {destination!r}, but the required app "
-						"is not installed on this site. Update NextIQ Settings."
+						"Cannot create a lead: install Frappe CRM or ERPNext on this site and "
+						f"check 'Create Lead In' in NextIQ Settings (currently {destination!r})."
 					)
 
 				if make_erpnext:
@@ -1335,7 +1338,7 @@ def _send_feedback_to_service(log_name, feedback_type):
 # ── Email notification ────────────────────────────────────────────────────────
 
 def _send_scan_notification(log_name, outcome, lead_name=None, message=None, scans_remaining=None):
-	"""Send email to the ERPNext user who submitted the scan."""
+	"""Send email to the user who submitted the scan."""
 	try:
 		owner = frappe.db.get_value("Card Scan Log", log_name, "owner")
 		user_email = frappe.db.get_value("User", owner, "email")

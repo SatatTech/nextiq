@@ -98,7 +98,6 @@
    "label": "Lead Destination"
   },
   {
-   "default": "ERPNext",
    "description": "Choose where to create a lead when a business card is scanned successfully.",
    "fieldname": "lead_destination",
    "fieldtype": "Select",
